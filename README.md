@@ -13,7 +13,7 @@ Functions your scripts may have:
 * `frame(obj)` function, called each frame (go figure)
     * Takes as argument that object that was passed last time
     * Must return an array of tuples, `(material, transform)`
-* `event(event, obj)` function, called each frame
+* `event(event, obj)` function, called each event
 
 Functions you can call:
 * `mesh(vertices, indices)`: Takes a table of vertices and a table of indices and returns a Mesh object
@@ -44,6 +44,7 @@ Functions you can call:
     1. High-level LUA interpreter
     2. Mid-level WASM acceleration plugins for use in LUA or just scripts on their own
     3. Low-level Engine code (Rust)
+* Use it for your portal game for game logic/editing. It would also be poggers to be able to save some of the state...
 
 ```lua
 function frame()

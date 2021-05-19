@@ -1,8 +1,30 @@
 use watertender::prelude::*;
-
 use anyhow::Result;
+use slotmap::new_key_type;
 
-struct App {
+new_key_type! {
+    /// Handle for a Material (Draw commands)
+    pub struct Shader;
+
+    /// Handle for a Mesh (Draw content)
+    pub struct Mesh;
+}
+
+pub struct DrawCmd {
+    pub material: Material,
+}
+
+pub struct FramePacket {
+    
+}
+
+pub trait UserCode {
+    fn init(&mut self, engine: &mut RenderEngine);
+    fn frame(&mut self, engine: &mut RenderEngine) -> FramePacket;
+    fn event(&mut self, engine: &mut RenderEngine, event: PlatformEvent);
+}
+
+pub struct RenderEngine {
     rainbow_cube: ManagedMesh,
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
@@ -10,12 +32,7 @@ struct App {
     camera: MultiPlatformCamera,
     anim: f32,
     starter_kit: StarterKit,
-}
-
-fn main() -> Result<()> {
-    let info = AppInfo::default().validation(true);
-    let vr = std::env::args().count() > 1;
-    launch::<App>(info, vr)
+    user_code: Box<dyn UserCode>,
 }
 
 #[repr(C)]
@@ -28,8 +45,9 @@ struct SceneData {
 unsafe impl bytemuck::Zeroable for SceneData {}
 unsafe impl bytemuck::Pod for SceneData {}
 
-impl MainLoop for App {
-    fn new(core: &SharedCore, mut platform: Platform<'_>) -> Result<Self> {
+impl MainLoop for RenderEngine {
+    type Args = Box<dyn UserCode>;
+    fn new(core: &SharedCore, mut platform: Platform<'_>, user: Self::Args) -> Result<Self> {
         let mut starter_kit = StarterKit::new(core.clone(), &mut platform)?;
 
         // Camera
@@ -148,7 +166,7 @@ impl MainLoop for App {
     }
 }
 
-impl SyncMainLoop for App {
+impl SyncMainLoop for RenderEngine {
     fn winit_sync(&self) -> (vk::Semaphore, vk::Semaphore) {
         self.starter_kit.winit_sync()
     }
