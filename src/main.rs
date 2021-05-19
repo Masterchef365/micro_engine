@@ -11,6 +11,7 @@ use slotmap::Key;
 use slotmap::SlotMap;
 use std::{cell::RefCell, rc::Rc};
 use watertender::vk::PrimitiveTopology;
+use engine::Transform;
 
 /// Names and stored operations to be submitted to the engine
 #[derive(Default)]
@@ -23,7 +24,6 @@ struct NewDataLua {
 
 struct LuaInterface {
     new_data: Rc<RefCell<NewDataLua>>,
-    my_mesh: Option<Mesh>,
     my_shader: Option<Shader>,
     lua: &'static Lua,
     frame_fn: LuaFunction<'static>,
@@ -91,7 +91,6 @@ impl LuaInterface {
             frame_fn,
             new_data,
             my_shader: None,
-            my_mesh: None,
         })
     }
 
@@ -109,11 +108,7 @@ impl LuaInterface {
 
 impl UserCode for LuaInterface {
     fn init(&mut self, engine: &mut RenderEngine) -> Result<()> {
-        //let mut new_data = self.new_data.borrow_mut();
-
-        /*
-        let (vertices, indices) = rainbow_cube();
-        let my_mesh = new_data.add_mesh(vertices, indices);
+        let mut new_data = self.new_data.borrow_mut();
 
         let my_shader = new_data.shaders.insert(());
         let fragment_src = &std::fs::read(r"shaders\unlit.frag.spv")?;
@@ -121,10 +116,8 @@ impl UserCode for LuaInterface {
         engine.add_shader(vertex_src, fragment_src, PrimitiveTopology::TRIANGLE_LIST, my_shader)?;
 
         self.my_shader = Some(my_shader);
-        self.my_mesh = Some(my_mesh);
 
         drop(new_data);
-        */
 
         self.update_lua_data(engine)?;
 
@@ -133,22 +126,30 @@ impl UserCode for LuaInterface {
 
     fn frame(&mut self, engine: &mut RenderEngine) -> Result<FramePacket> {
         let table = self.frame_fn.call::<(), LuaTable>(()).unwrap(); // TODO: DON'T UNWRAP!
-                                                                     //table.
-
         self.update_lua_data(engine)?;
 
-        if let Some((mesh, shader)) = self.my_mesh.zip(self.my_shader) {
-            Ok(vec![DrawCmd {
+        let mut cmds = Vec::new();
+        for cmd in table.sequence_values() {
+            let table: LuaTable = cmd.unwrap();
+            let mut transform: Transform = [[0.0f32; 4]; 4];
+            let in_trans: Vec<f32> = table.get(1).unwrap();
+            for (i, o) in in_trans.chunks_exact(4).zip(transform.iter_mut()) {
+                o.copy_from_slice(&i[..]);
+            }
+            let mesh_id: u64 = table.get(2).unwrap(); // TODO: Use Lua LightUserData or something
+            let mesh = Mesh::from(slotmap::KeyData::from_ffi(mesh_id));
+
+            cmds.push(DrawCmd {
+                transform,
                 mesh,
-                shader,
-                transform: *watertender::nalgebra::Matrix4::<f32>::identity().as_ref(),
-            }])
-        } else {
-            Ok(vec![])
+                shader: self.my_shader.unwrap()
+            })
         }
+
+        Ok(cmds)
     }
 
-    fn event(&mut self, engine: &mut RenderEngine, event: &PlatformEvent) -> Result<()> {
+    fn event(&mut self, _engine: &mut RenderEngine, _event: &PlatformEvent) -> Result<()> {
         Ok(())
     }
 }

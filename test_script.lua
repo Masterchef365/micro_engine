@@ -1,13 +1,29 @@
-
-
 function init()
     mesh = rainbow_cube()
-    print(mesh)
-    key = add_mesh(mesh)
+    key = add_mesh(mesh[1], mesh[2])
 end
 
 function frame()
-    return {}
+    return {
+        {
+            {
+                1., 0., 0., 0.,
+                0., 1., 0., 0.,
+                0., 0., 1., 0.,
+                0., 0., 0., 1.,
+            },
+            key,
+        },
+        {
+            {
+                1., 0., 0., 0.,
+                0., 1., 0., 0.,
+                0., 0., 1., 0.,
+                3., 0., 0., 1.,
+            },
+            key,
+        }
+    }
 end
 
 function rainbow_cube()
