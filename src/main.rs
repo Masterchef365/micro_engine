@@ -1,12 +1,13 @@
+use anyhow::{format_err, Result};
+use engine::{Mesh, RenderEngine, Shader};
+use mlua::prelude::*;
 use watertender::app_info::AppInfo;
 use watertender::mainloop::PlatformEvent;
 use watertender::starter_kit::launch;
 use watertender::vertex::Vertex;
-use engine::{RenderEngine, Mesh, Shader};
-use anyhow::{format_err, Result};
-use mlua::prelude::*;
 mod engine;
-use engine::{Main, UserCode, FramePacket, DrawCmd};
+use engine::{DrawCmd, FramePacket, Main, UserCode};
+use slotmap::Key;
 use slotmap::SlotMap;
 use std::{cell::RefCell, rc::Rc};
 use watertender::vk::PrimitiveTopology;
@@ -35,7 +36,12 @@ impl NewDataLua {
         key
     }
 
-    pub fn add_shader(&mut self, vertex_src: String, index_src: String, topo: PrimitiveTopology) -> Shader {
+    pub fn add_shader(
+        &mut self,
+        vertex_src: String,
+        index_src: String,
+        topo: PrimitiveTopology,
+    ) -> Shader {
         let key = self.shaders.insert(());
         self.added_shaders.push((key, vertex_src, index_src, topo));
         key
@@ -49,17 +55,41 @@ impl LuaInterface {
             .eval::<mlua::MultiValue>()
             .map_err(|e| format_err!("{}", e))?;
 
+        let lua = lua.into_static();
+        let globals = lua.globals();
+
+        let frame_fn = globals
+            .get::<_, LuaFunction>("frame")
+            .expect("Requires frame fn"); // TODO: DON'T UNWRAP
+
+        let new_data = Rc::new(RefCell::new(NewDataLua::default()));
+        let new_data_clone = new_data.clone();
+        let create_mesh_fn = lua
+            .create_function(move |_, (vertices, indices): (Vec<f32>, Vec<u32>)| {
+                let vertices = vertices
+                    .chunks_exact(6)
+                    .map(|chunk| Vertex {
+                        pos: [chunk[0], chunk[1], chunk[2]],
+                        color: [chunk[3], chunk[4], chunk[5]],
+                    })
+                    .collect();
+                Ok(new_data_clone
+                    .borrow_mut()
+                    .add_mesh(vertices, indices)
+                    .data()
+                    .as_ffi())
+            })
+            .unwrap();
+        globals.set("add_mesh", create_mesh_fn).unwrap();
+
         if let Ok(init_fn) = lua.globals().get::<_, LuaFunction>("init") {
             init_fn.call::<(), ()>(()).unwrap(); // TODO: DON'T UNWRAP
         }
 
-        let lua = lua.into_static();
-        let frame_fn = lua.globals().get::<_, LuaFunction>("frame").expect("Requires frame fn"); // TODO: DON'T UNWRAP
-
         Ok(LuaInterface {
             lua,
             frame_fn,
-            new_data: Rc::new(RefCell::new(NewDataLua::default())),
+            new_data,
             my_shader: None,
             my_mesh: None,
         })
@@ -101,24 +131,26 @@ impl UserCode for LuaInterface {
         Ok(())
     }
 
-    fn frame(&mut self, engine: &mut RenderEngine) -> Result<FramePacket> { 
-        self.frame_fn.call::<(), ()>(()).unwrap(); // TODO: DON'T UNWRAP!
+    fn frame(&mut self, engine: &mut RenderEngine) -> Result<FramePacket> {
+        let table = self.frame_fn.call::<(), LuaTable>(()).unwrap(); // TODO: DON'T UNWRAP!
+                                                                     //table.
+
         self.update_lua_data(engine)?;
 
         if let Some((mesh, shader)) = self.my_mesh.zip(self.my_shader) {
-        Ok(vec![
-            DrawCmd {
+            Ok(vec![DrawCmd {
                 mesh,
                 shader,
                 transform: *watertender::nalgebra::Matrix4::<f32>::identity().as_ref(),
-            }
-        ])
+            }])
         } else {
             Ok(vec![])
         }
     }
 
-    fn event(&mut self, engine: &mut RenderEngine, event: &PlatformEvent) -> Result<()> { Ok(()) }
+    fn event(&mut self, engine: &mut RenderEngine, event: &PlatformEvent) -> Result<()> {
+        Ok(())
+    }
 }
 
 fn main() -> Result<()> {
