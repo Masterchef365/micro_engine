@@ -10,3 +10,4 @@ mlua = { version = "0.5", features = ["lua54", "vendored"] }
 anyhow = "1"
 shaderc = "0.7"
 bytemuck = "1.5"
+slotmap = "1.0"

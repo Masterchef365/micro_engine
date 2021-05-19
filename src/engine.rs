@@ -1,6 +1,6 @@
 use watertender::prelude::*;
 use anyhow::Result;
-use slotmap::new_key_type;
+use slotmap::{new_key_type, SecondaryMap};
 
 new_key_type! {
     /// Handle for a Material (Draw commands)
@@ -11,12 +11,12 @@ new_key_type! {
 }
 
 pub struct DrawCmd {
-    pub material: Material,
+    pub material: Shader,
+    pub mesh: Mesh,
+    pub transform: [f32; 4 * 4],
 }
 
-pub struct FramePacket {
-    
-}
+pub type FramePacket = Vec<DrawCmd>;
 
 pub trait UserCode {
     fn init(&mut self, engine: &mut RenderEngine);
@@ -25,14 +25,16 @@ pub trait UserCode {
 }
 
 pub struct RenderEngine {
-    rainbow_cube: ManagedMesh,
-    pipeline: vk::Pipeline,
+    shaders: SecondaryMap<Shader, vk::Pipeline>,
+    meshes: SecondaryMap<Mesh, ManagedMesh>,
+
     pipeline_layout: vk::PipelineLayout,
     scene_ubo: FrameDataUbo<SceneData>,
     camera: MultiPlatformCamera,
     anim: f32,
     starter_kit: StarterKit,
     user_code: Box<dyn UserCode>,
+    core: SharedCore,
 }
 
 #[repr(C)]
@@ -44,6 +46,32 @@ struct SceneData {
 
 unsafe impl bytemuck::Zeroable for SceneData {}
 unsafe impl bytemuck::Pod for SceneData {}
+
+impl RenderEngine {
+    /// Add a mesh, or replace an existing one with the same name
+    pub fn add_mesh(&mut self, vertices: &[Vertex], indices: &[u16], key: Mesh) {
+        // Mesh uploads
+        let (vertices, indices) = rainbow_cube();
+        let rainbow_cube = upload_mesh(
+            &mut starter_kit.staging_buffer,
+            starter_kit.command_buffers[0],
+            &vertices,
+            &indices,
+        )?;
+    }
+
+    /// Add a shader, or replace an existing one with the same name
+    pub fn add_shader(&mut self, vertex_spv: &[u8], fragment_spv: &[u8], topo: vk::PrimitiveTopology, key: Shader) {
+        let pipeline = shader(
+            self.core.clone(),
+            vertex_spv,
+            fragment_spv,
+            topo,
+            starter_kit.render_pass,
+            pipeline_layout,
+        )?;
+    }
+}
 
 impl MainLoop for RenderEngine {
     type Args = Box<dyn UserCode>;
@@ -71,33 +99,15 @@ impl MainLoop for RenderEngine {
         let pipeline_layout =
             unsafe { core.device.create_pipeline_layout(&create_info, None, None) }.result()?;
 
-        // Pipeline
-        let pipeline = shader(
-            core,
-            include_bytes!("unlit.vert.spv"),
-            include_bytes!("unlit.frag.spv"),
-            vk::PrimitiveTopology::TRIANGLE_LIST,
-            starter_kit.render_pass,
-            pipeline_layout,
-        )?;
-
-        // Mesh uploads
-        let (vertices, indices) = rainbow_cube();
-        let rainbow_cube = upload_mesh(
-            &mut starter_kit.staging_buffer,
-            starter_kit.command_buffers[0],
-            &vertices,
-            &indices,
-        )?;
-
         Ok(Self {
             camera,
             anim: 0.0,
             pipeline_layout,
             scene_ubo,
-            rainbow_cube,
-            pipeline,
             starter_kit,
+            core: core.clone(),
+            meshes: SecondaryMap::new(),
+            shaders: SecondaryMap::new(),
         })
     }
 

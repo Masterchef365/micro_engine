@@ -13,6 +13,11 @@ struct LuaInterface {
 
 impl LuaInterface {
     fn new() -> Result<Self> {
+        let mut lua = Lua::new();
+        lua.load(&std::fs::read_to_string("./test_script.lua")?)
+            .eval::<mlua::MultiValue>()
+            .map_err(|e| format_err!("{}", e))?;
+
         Ok(LuaInterface {})
     }
 }
@@ -23,21 +28,9 @@ impl UserCode for LuaInterface {
     fn event(&mut self, engine: &mut RenderEngine, event: PlatformEvent) { todo!() }
 }
 
-
 fn main() -> Result<()> {
     let info = AppInfo::default().validation(true);
     let vr = std::env::args().count() > 1;
     let lua = LuaInterface::new()?;
-    launch::<RenderEngine>(info, vr, Box::new(lua))
+    launch::<Box<dyn UserCode>, RenderEngine>(info, vr, Box::new(lua))
 }
-
-/*
-fn main() -> Result<()> {
-    let mut lua = Lua::new();
-    lua.load(&std::fs::read_to_string("./test_script.lua")?)
-        .eval::<mlua::MultiValue>()
-        .map_err(|e| format_err!("{}", e))?;
-
-    Ok(())
-}
-*/
