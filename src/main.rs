@@ -6,9 +6,10 @@ use anyhow::{format_err, Result};
 use mlua::prelude::*;
 mod engine;
 use engine::{UserCode, FramePacket, DrawCmd};
+use slotmap::SlotMap;
 
 struct LuaInterface {
-
+    
 }
 
 impl LuaInterface {
@@ -19,6 +20,9 @@ impl LuaInterface {
             .map_err(|e| format_err!("{}", e))?;
 
         Ok(LuaInterface {})
+
+        // So the idea is to keep the PRIMARY slotmaps in LuaInterface or whatever, and then track insertions during LUA runtime. 
+        // Then do the actual engine load after the frame or init finishes. Make this just a routine
     }
 }
 
@@ -33,4 +37,24 @@ fn main() -> Result<()> {
     let vr = std::env::args().count() > 1;
     let lua = LuaInterface::new()?;
     launch::<Box<dyn UserCode>, RenderEngine>(info, vr, Box::new(lua))
+}
+
+fn rainbow_cube() -> (Vec<Vertex>, Vec<u32>) {
+    let vertices = vec![
+        Vertex::new([-1.0, -1.0, -1.0], [0.0, 1.0, 1.0]),
+        Vertex::new([1.0, -1.0, -1.0], [1.0, 0.0, 1.0]),
+        Vertex::new([1.0, 1.0, -1.0], [1.0, 1.0, 0.0]),
+        Vertex::new([-1.0, 1.0, -1.0], [0.0, 1.0, 1.0]),
+        Vertex::new([-1.0, -1.0, 1.0], [1.0, 0.0, 1.0]),
+        Vertex::new([1.0, -1.0, 1.0], [1.0, 1.0, 0.0]),
+        Vertex::new([1.0, 1.0, 1.0], [0.0, 1.0, 1.0]),
+        Vertex::new([-1.0, 1.0, 1.0], [1.0, 0.0, 1.0]),
+    ];
+
+    let indices = vec![
+        3, 1, 0, 2, 1, 3, 2, 5, 1, 6, 5, 2, 6, 4, 5, 7, 4, 6, 7, 0, 4, 3, 0, 7, 7, 2, 3, 6, 2, 7,
+        0, 5, 4, 1, 5, 0,
+    ];
+
+    (vertices, indices)
 }
