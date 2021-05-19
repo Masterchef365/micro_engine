@@ -13,7 +13,7 @@ new_key_type! {
 }
 
 // TODO: Make this expandable
-const MAX_TRANSFORMS: usize = 200; 
+const MAX_TRANSFORMS: usize = 5000; 
 
 type Transform = [[f32; 4]; 4];
 pub struct DrawCmd {

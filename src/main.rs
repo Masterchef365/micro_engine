@@ -8,13 +8,36 @@ use mlua::prelude::*;
 mod engine;
 use engine::{Main, UserCode, FramePacket, DrawCmd};
 use slotmap::SlotMap;
+use std::{cell::RefCell, rc::Rc};
+use watertender::vk::PrimitiveTopology;
 
-struct LuaInterface {
+/// Names and stored operations to be submitted to the engine
+#[derive(Default)]
+struct NewDataLua {
     meshes: SlotMap<Mesh, ()>,
     shaders: SlotMap<Shader, ()>,
-    
+    added_meshes: Vec<(Mesh, Vec<Vertex>, Vec<u32>)>,
+    added_shaders: Vec<(Shader, String, String, PrimitiveTopology)>,
+}
+
+struct LuaInterface {
+    new_data: Rc<RefCell<NewDataLua>>,
     my_mesh: Option<Mesh>,
     my_shader: Option<Shader>,
+}
+
+impl NewDataLua {
+    pub fn add_mesh(&mut self, vertices: Vec<Vertex>, indices: Vec<u32>) -> Mesh {
+        let key = self.meshes.insert(());
+        self.added_meshes.push((key, vertices, indices));
+        key
+    }
+
+    pub fn add_shader(&mut self, vertex_src: String, index_src: String, topo: PrimitiveTopology) -> Shader {
+        let key = self.shaders.insert(());
+        self.added_shaders.push((key, vertex_src, index_src, topo));
+        key
+    }
 }
 
 impl LuaInterface {
@@ -25,8 +48,7 @@ impl LuaInterface {
             .map_err(|e| format_err!("{}", e))?;
 
         Ok(LuaInterface {
-            meshes: SlotMap::with_key(),
-            shaders: SlotMap::with_key(),
+            new_data: Rc::new(RefCell::new(NewDataLua::default())),
             my_shader: None,
             my_mesh: None,
         })
@@ -36,24 +58,43 @@ impl LuaInterface {
     }
 }
 
+impl LuaInterface {
+    fn update_lua_data(&mut self, engine: &mut RenderEngine) -> Result<()> {
+        let mut new_data = self.new_data.borrow_mut();
+        for (key, vertices, indices) in new_data.added_meshes.drain(..) {
+            engine.add_mesh(&vertices, &indices, key)?;
+        }
+
+        // TODO: Shaders
+
+        Ok(())
+    }
+}
+
 impl UserCode for LuaInterface {
     fn init(&mut self, engine: &mut RenderEngine) -> Result<()> {
-        let my_mesh = self.meshes.insert(());
-        let (vertices, indices) = rainbow_cube();
-        engine.add_mesh(&vertices, &indices, my_mesh)?;
+        let mut new_data = self.new_data.borrow_mut();
 
-        let my_shader = self.shaders.insert(());
+        let (vertices, indices) = rainbow_cube();
+        let my_mesh = new_data.add_mesh(vertices, indices);
+
+        let my_shader = new_data.shaders.insert(());
         let fragment_src = &std::fs::read(r"shaders\unlit.frag.spv")?;
         let vertex_src = &std::fs::read(r"shaders\unlit.vert.spv")?;
-        engine.add_shader(vertex_src, fragment_src, watertender::vk::PrimitiveTopology::TRIANGLE_LIST, my_shader)?;
+        engine.add_shader(vertex_src, fragment_src, PrimitiveTopology::TRIANGLE_LIST, my_shader)?;
 
         self.my_shader = Some(my_shader);
         self.my_mesh = Some(my_mesh);
+
+        drop(new_data);
+        self.update_lua_data(engine)?;
 
         Ok(())
     }
 
     fn frame(&mut self, engine: &mut RenderEngine) -> Result<FramePacket> { 
+        self.update_lua_data(engine)?;
+
         if let Some((mesh, shader)) = self.my_mesh.zip(self.my_shader) {
         Ok(vec![
             DrawCmd {
