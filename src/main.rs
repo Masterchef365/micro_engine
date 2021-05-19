@@ -24,6 +24,8 @@ struct LuaInterface {
     new_data: Rc<RefCell<NewDataLua>>,
     my_mesh: Option<Mesh>,
     my_shader: Option<Shader>,
+    lua: &'static Lua,
+    frame_fn: LuaFunction<'static>,
 }
 
 impl NewDataLua {
@@ -42,23 +44,27 @@ impl NewDataLua {
 
 impl LuaInterface {
     fn new() -> Result<Self> {
-        let mut lua = Lua::new();
+        let lua = Lua::new();
         lua.load(&std::fs::read_to_string("./test_script.lua")?)
             .eval::<mlua::MultiValue>()
             .map_err(|e| format_err!("{}", e))?;
 
+        if let Ok(init_fn) = lua.globals().get::<_, LuaFunction>("init") {
+            init_fn.call::<(), ()>(()).unwrap(); // TODO: DON'T UNWRAP
+        }
+
+        let lua = lua.into_static();
+        let frame_fn = lua.globals().get::<_, LuaFunction>("frame").expect("Requires frame fn"); // TODO: DON'T UNWRAP
+
         Ok(LuaInterface {
+            lua,
+            frame_fn,
             new_data: Rc::new(RefCell::new(NewDataLua::default())),
             my_shader: None,
             my_mesh: None,
         })
-
-        // So the idea is to keep the PRIMARY slotmaps in LuaInterface or whatever, and then track insertions during LUA runtime. 
-        // Then do the actual engine load after the frame or init finishes. Make this just a routine
     }
-}
 
-impl LuaInterface {
     fn update_lua_data(&mut self, engine: &mut RenderEngine) -> Result<()> {
         let mut new_data = self.new_data.borrow_mut();
         for (key, vertices, indices) in new_data.added_meshes.drain(..) {
@@ -73,8 +79,9 @@ impl LuaInterface {
 
 impl UserCode for LuaInterface {
     fn init(&mut self, engine: &mut RenderEngine) -> Result<()> {
-        let mut new_data = self.new_data.borrow_mut();
+        //let mut new_data = self.new_data.borrow_mut();
 
+        /*
         let (vertices, indices) = rainbow_cube();
         let my_mesh = new_data.add_mesh(vertices, indices);
 
@@ -87,12 +94,15 @@ impl UserCode for LuaInterface {
         self.my_mesh = Some(my_mesh);
 
         drop(new_data);
+        */
+
         self.update_lua_data(engine)?;
 
         Ok(())
     }
 
     fn frame(&mut self, engine: &mut RenderEngine) -> Result<FramePacket> { 
+        self.frame_fn.call::<(), ()>(()).unwrap(); // TODO: DON'T UNWRAP!
         self.update_lua_data(engine)?;
 
         if let Some((mesh, shader)) = self.my_mesh.zip(self.my_shader) {
