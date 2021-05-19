@@ -43,8 +43,8 @@ impl UserCode for LuaInterface {
         engine.add_mesh(&vertices, &indices, my_mesh)?;
 
         let my_shader = self.shaders.insert(());
-        let fragment_src = &std::fs::read(r"..\watertender\examples\unlit.frag.spv")?;
-        let vertex_src = &std::fs::read(r"..\watertender\examples\unlit.frag.spv")?;
+        let fragment_src = &std::fs::read(r"shaders\unlit.frag.spv")?;
+        let vertex_src = &std::fs::read(r"shaders\unlit.vert.spv")?;
         engine.add_shader(vertex_src, fragment_src, watertender::vk::PrimitiveTopology::TRIANGLE_LIST, my_shader)?;
 
         self.my_shader = Some(my_shader);
@@ -67,7 +67,7 @@ impl UserCode for LuaInterface {
         }
     }
 
-    fn event(&mut self, engine: &mut RenderEngine, event: PlatformEvent) -> Result<()> { Ok(()) }
+    fn event(&mut self, engine: &mut RenderEngine, event: &PlatformEvent) -> Result<()> { Ok(()) }
 }
 
 fn main() -> Result<()> {

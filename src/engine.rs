@@ -28,7 +28,7 @@ pub type FramePacket = Vec<DrawCmd>;
 pub trait UserCode {
     fn init(&mut self, engine: &mut RenderEngine) -> Result<()>;
     fn frame(&mut self, engine: &mut RenderEngine) -> Result<FramePacket>;
-    fn event(&mut self, engine: &mut RenderEngine, event: PlatformEvent) -> Result<()>;
+    fn event(&mut self, engine: &mut RenderEngine, event: &PlatformEvent) -> Result<()>;
 }
 
 /// RenderEngine mainloop integration, usercode execution
@@ -39,7 +39,7 @@ pub struct Main {
 
 impl MainLoop for Main {
     type Args = Box<dyn UserCode>;
-    fn new(core: &SharedCore, mut platform: Platform<'_>, user_code: Self::Args) -> Result<Self> {
+    fn new(core: &SharedCore, mut platform: Platform<'_>, mut user_code: Self::Args) -> Result<Self> {
         let mut engine = RenderEngine::new(core, platform)?;
         user_code.init(&mut engine)?;
         Ok(Self {
@@ -68,7 +68,7 @@ impl MainLoop for Main {
         core: &Core,
         mut platform: Platform<'_>,
     ) -> Result<()> {
-        self.user_code.event(&mut self.engine, event)?;
+        self.user_code.event(&mut self.engine, &event)?;
         self.engine.event(event, core, platform)
     }
 }
@@ -110,9 +110,10 @@ impl RenderEngine {
     /// Add a mesh, or replace an existing one with the same name
     pub fn add_mesh(&mut self, vertices: &[Vertex], indices: &[u32], key: Mesh) -> Result<()> {
         // Mesh uploads
+        let cmd = self.starter_kit.current_command_buffer();
         let mesh = upload_mesh(
             &mut self.starter_kit.staging_buffer,
-            self.starter_kit.current_command_buffer(),
+            cmd,
             vertices,
             indices,
         )?;
@@ -296,27 +297,43 @@ impl RenderEngine {
             );
 
             // Draw cmds
-            /*
-            core.device.cmd_bind_pipeline(
-                command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                self.pipeline,
-            );
+            // TODO: Batch draw calls per pipeline...
+            for (idx, cmd) in packet.into_iter().enumerate() {
+                let mesh = match self.meshes.get(cmd.mesh) {
+                    Some(m) => m,
+                    None => {
+                        eprintln!("Mesh unavailable!");
+                        continue;
+                    }
+                };
+                let shader = match self.shaders.get(cmd.shader) {
+                    Some(s) => s,
+                    None => {
+                        eprintln!("Shader unavailable!");
+                        continue;
+                    }
+                };
 
-            core.device.cmd_bind_vertex_buffers(
-                command_buffer,
-                0,
-                &[self.rainbow_cube.vertices.instance()],
-                &[0],
-            );
-            core.device.cmd_bind_index_buffer(
-                command_buffer,
-                self.rainbow_cube.indices.instance(),
-                0,
-                vk::IndexType::UINT32,
-            );
 
-            for idx in 0..frame_data.positions.len() {
+                core.device.cmd_bind_pipeline(
+                    command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    *shader,
+                );
+
+                core.device.cmd_bind_vertex_buffers(
+                    command_buffer,
+                    0,
+                    &[mesh.vertices.instance()],
+                    &[0],
+                );
+                core.device.cmd_bind_index_buffer(
+                    command_buffer,
+                    mesh.indices.instance(),
+                    0,
+                    vk::IndexType::UINT32,
+                );
+
                 let push_const = [idx as u32];
                 // TODO: Make this a shortcut
                 core.device.cmd_push_constants(
@@ -327,16 +344,16 @@ impl RenderEngine {
                     std::mem::size_of_val(&push_const) as u32,
                     push_const.as_ptr() as _,
                 );
+
                 core.device.cmd_draw_indexed(
                     command_buffer,
-                    self.rainbow_cube.n_indices,
+                    mesh.n_indices,
                     1,
                     0,
                     0,
                     0,
                 );
             }
-            */
         }
 
         let (ret, cameras) = self.camera.get_matrices(platform)?;
