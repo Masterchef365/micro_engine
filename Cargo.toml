@@ -1,0 +1,11 @@
+[package]
+name = "micro_engine"
+version = "0.1.0"
+authors = ["Duncan Freeman <dfreeman@lucidyne.com>"]
+edition = "2018"
+
+[dependencies]
+watertender = { path = "../watertender" }
+mlua = { version = "0.5", features = ["lua54", "vendored"] }
+anyhow = "1"
+shaderc = "0.7"
