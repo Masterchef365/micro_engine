@@ -1,4 +1,6 @@
 use watertender::prelude::*;
+use defaults::FRAMES_IN_FLIGHT;
+use watertender::memory;
 use anyhow::Result;
 use slotmap::{new_key_type, SecondaryMap};
 
@@ -11,12 +13,14 @@ new_key_type! {
 }
 
 // TODO: Make this expandable
-const MAX_TRANSFORMS: usize = 2; 
+const MAX_TRANSFORMS: usize = 200; 
 
+type Transform = [[f32; 4]; 4];
 pub struct DrawCmd {
-    pub material: Shader,
+    pub shader: Shader,
     pub mesh: Mesh,
-    pub transform: [f32; 4 * 4],
+    /// Transform in column-major format
+    pub transform: Transform,
 }
 
 pub type FramePacket = Vec<DrawCmd>;
@@ -35,7 +39,7 @@ pub struct Main {
 
 impl MainLoop for Main {
     type Args = Box<dyn UserCode>;
-    fn new(&mut self, core: &SharedCore, mut platform: Platform<'_>, user_code: Self::Args) -> Result<Self> {
+    fn new(core: &SharedCore, mut platform: Platform<'_>, user_code: Self::Args) -> Result<Self> {
         let mut engine = RenderEngine::new(core, platform)?;
         user_code.init(&mut engine)?;
         Ok(Self {
@@ -55,13 +59,13 @@ impl MainLoop for Main {
     }
 
     fn swapchain_resize(&mut self, images: Vec<vk::Image>, extent: vk::Extent2D) -> Result<()> {
-        self.starter_kit.swapchain_resize(images, extent)
+        self.engine.swapchain_resize(images, extent)
     }
 
     fn event(
         &mut self,
         mut event: PlatformEvent<'_, '_>,
-        _core: &Core,
+        core: &Core,
         mut platform: Platform<'_>,
     ) -> Result<()> {
         self.user_code.event(&mut self.engine, event)?;
@@ -80,6 +84,10 @@ pub struct RenderEngine {
     meshes: SecondaryMap<Mesh, ManagedMesh>,
 
     transforms: Vec<ManagedBuffer>,
+
+    descriptor_sets: Vec<vk::DescriptorSet>,
+    descriptor_pool: vk::DescriptorPool,
+    descriptor_set_layout: vk::DescriptorSetLayout,
 
     pipeline_layout: vk::PipelineLayout,
     scene_ubo: FrameDataUbo<SceneData>,
@@ -136,22 +144,6 @@ impl RenderEngine {
 
         // Scene data
         let scene_ubo = FrameDataUbo::new(core.clone(), defaults::FRAMES_IN_FLIGHT)?;
-
-        let descriptor_set_layouts = [scene_ubo.descriptor_set_layout()];
-
-        // Pipeline layout
-        let push_constant_ranges = [vk::PushConstantRangeBuilder::new()
-            .stage_flags(vk::ShaderStageFlags::VERTEX)
-            .offset(0)
-            .size(std::mem::size_of::<[f32; 4 * 4]>() as u32)];
-
-        let create_info = vk::PipelineLayoutCreateInfoBuilder::new()
-            .push_constant_ranges(&push_constant_ranges)
-            .set_layouts(&descriptor_set_layouts);
-
-        let pipeline_layout =
-            unsafe { core.device.create_pipeline_layout(&create_info, None, None) }.result()?;
-
 
         // Transforms data
         let total_size = std::mem::size_of::<Transform>() * MAX_TRANSFORMS;
@@ -216,7 +208,7 @@ impl RenderEngine {
 
         // Write descriptor sets
         for (frame, &descriptor_set) in descriptor_sets.iter().enumerate() {
-            let frame_data_bi = [scene_data.descriptor_buffer_info(frame)];
+            let frame_data_bi = [scene_ubo.descriptor_buffer_info(frame)];
             let transform_bi = [vk::DescriptorBufferInfoBuilder::new()
                 .buffer(transforms[frame].instance())
                 .offset(0)
@@ -262,7 +254,10 @@ impl RenderEngine {
             pipeline_layout,
             scene_ubo,
             starter_kit,
-            user_code: None,
+            transforms,
+            descriptor_set_layout,
+            descriptor_sets,
+            descriptor_pool,
             meshes: SecondaryMap::new(),
             shaders: SecondaryMap::new(),
         };
@@ -278,30 +273,70 @@ impl RenderEngine {
         packet: FramePacket,
     ) -> Result<PlatformReturn> {
         let cmd = self.starter_kit.begin_command_buffer(frame)?;
-        let command_buffer = cmd.command_buffer;
 
+        // Collect and write transforms
+        let mut positions: Vec<Transform> = packet.iter().map(|cmd| cmd.transform).collect();
+        if positions.len() >= MAX_TRANSFORMS {
+            eprintln!("Too many positions!");
+            positions.truncate(MAX_TRANSFORMS);
+        }
+        self.transforms[self.starter_kit.frame]
+            .write_bytes(0, bytemuck::cast_slice(positions.as_slice()))?;
+
+        // Write command buffer
+        let command_buffer = cmd.command_buffer;
         unsafe {
             core.device.cmd_bind_descriptor_sets(
                 command_buffer,
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline_layout,
                 0,
-                &[self.scene_ubo.descriptor_set(self.starter_kit.frame)],
+                &[self.descriptor_sets[self.starter_kit.frame]],
                 &[],
             );
 
             // Draw cmds
+            /*
             core.device.cmd_bind_pipeline(
                 command_buffer,
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline,
             );
 
-            draw_meshes(
-                core,
+            core.device.cmd_bind_vertex_buffers(
                 command_buffer,
-                std::slice::from_ref(&&self.rainbow_cube),
+                0,
+                &[self.rainbow_cube.vertices.instance()],
+                &[0],
             );
+            core.device.cmd_bind_index_buffer(
+                command_buffer,
+                self.rainbow_cube.indices.instance(),
+                0,
+                vk::IndexType::UINT32,
+            );
+
+            for idx in 0..frame_data.positions.len() {
+                let push_const = [idx as u32];
+                // TODO: Make this a shortcut
+                core.device.cmd_push_constants(
+                    command_buffer,
+                    self.pipeline_layout,
+                    vk::ShaderStageFlags::VERTEX,
+                    0,
+                    std::mem::size_of_val(&push_const) as u32,
+                    push_const.as_ptr() as _,
+                );
+                core.device.cmd_draw_indexed(
+                    command_buffer,
+                    self.rainbow_cube.n_indices,
+                    1,
+                    0,
+                    0,
+                    0,
+                );
+            }
+            */
         }
 
         let (ret, cameras) = self.camera.get_matrices(platform)?;
@@ -334,9 +369,7 @@ impl RenderEngine {
         starter_kit::close_when_asked(event, platform);
         Ok(())
     }
-}
 
-impl SyncMainLoop for RenderEngine {
     fn winit_sync(&self) -> (vk::Semaphore, vk::Semaphore) {
         self.starter_kit.winit_sync()
     }
