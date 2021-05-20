@@ -2,20 +2,28 @@ use anyhow::Result;
 use crate::engine::RenderEngine;
 use watertender::prelude::*;
 use crate::lua_module::LuaModule;
+use std::sync::mpsc::{self, Receiver};
+use crate::console::{console as run_console, ConsoleMsg};
 
-/// Lua and 
+/// Top-level parts that run under the watertender Mainloop
 pub struct Main {
     engine: RenderEngine,
     lua_module: LuaModule,
+    console: Receiver<ConsoleMsg>,
 }
 
 impl MainLoop for Main {
     fn new(core: &SharedCore, platform: Platform<'_>) -> Result<Self> {
         let mut engine = RenderEngine::new(core, platform)?;
         let mut lua_module = LuaModule::new()?;
+
+        let (console_tx, console) = mpsc::channel();
+        std::thread::spawn(move || run_console(console_tx));
+
         lua_module.init(&mut engine)?;
 
         Ok(Self {
+            console,
             engine,
             lua_module,
         })
