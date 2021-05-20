@@ -43,15 +43,16 @@ impl MainLoop for Main {
         &mut self,
         frame: Frame,
         core: &SharedCore,
-        platform: Platform<'_>,
+        mut platform: Platform<'_>,
     ) -> Result<PlatformReturn> {
         for msg in self.console.try_iter() {
             match msg {
                 ConsoleMsg::Command(s) => {
                     print_lua_ret(self.lua_module.lua.load(&s).eval());
                 },
+                ConsoleMsg::Reset => todo!("Reset command"),
+                ConsoleMsg::Exit => platform.request_exit(),
                 ConsoleMsg::Reload => self.lua_module.reload(),
-                _ => todo!("Console commands"),
             }
         }
 

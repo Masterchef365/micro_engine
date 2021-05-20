@@ -24,7 +24,7 @@ pub fn console(tx: Sender<ConsoleMsg>) {
                 }
                 tx.send(cmd).expect("Console failed to send message")
             }
-            Err(_) => return,
+            Err(_) => break,
         }
     }
 
