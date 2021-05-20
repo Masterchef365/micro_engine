@@ -3,10 +3,13 @@ dofile("lin_alg.lua")
 objs = {}
 
 function reload()
-    if anim == nil then anim = 0.0 end
-    if mesh == nil then 
+    if init == nil then
+        anim = 0.0
+
         data = rainbow_cube()
         mesh = add_mesh(data[1], data[2])
+
+        init = true
     end
 end
 
@@ -14,19 +17,14 @@ function frame()
     anim = anim + 0.01
     return {
         {
-            cannon(
-                gemm(
-                    translate(3, 0, 0), 
-                    gemm(
-                        rot_y(anim),
-                        translate(0, 4, 2)
-                    )
-                )
-            ),
+            cannon(gemm(
+                translate(0, math.sin(anim), 0),
+                rot_y(anim)
+            )),
             mesh,
         },
         {
-            cannon(identity),
+            cannon(translate(3, 0, 0)),
             mesh,
         },
         table.unpack(objs)
