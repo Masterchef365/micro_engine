@@ -7,6 +7,7 @@ use slotmap::Key;
 use slotmap::SlotMap;
 use std::{path::PathBuf, cell::RefCell, rc::Rc};
 use watertender::vk::PrimitiveTopology;
+use crate::console::console_print;
 
 /// Lua code
 pub struct LuaModule {
@@ -58,12 +59,20 @@ impl LuaModule {
             my_shader: None,
         };
 
-        instance.reload()?;
+        instance.reload();
 
         Ok(instance)
     }
 
-    pub fn reload(&mut self) -> Result<()> {
+
+    pub fn reload(&mut self) {
+        match self.try_reload() {
+            Err(e) => console_print(&format!("Reload error: {}", e)),
+            Ok(_) => console_print("Reload successful."),
+        }
+    }
+
+    pub fn try_reload(&mut self) -> Result<()> {
         self.lua.load(&std::fs::read_to_string(&self.path).context("Failed to load script")?)
             .eval::<mlua::MultiValue>()
             .map_err(|e| format_err!("{}", e))?;
@@ -114,7 +123,15 @@ impl LuaModule {
             None => return Ok(vec![]),
         };
 
-        let table = frame_fn.call::<(), LuaTable>(()).unwrap(); // TODO: DON'T UNWRAP!
+        let table = match frame_fn.call::<(), LuaTable>(()) {
+            Err(e) => {
+                console_print(&format!("Frame error: {}", e));
+                self.frame_fn = None;
+                return Ok(vec![]);
+            }
+            Ok(t) => t,
+        };
+
         self.update_lua_data(engine)?;
 
         let mut cmds = Vec::new();

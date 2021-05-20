@@ -50,13 +50,13 @@ impl MainLoop for Main {
                 ConsoleMsg::Command(s) => {
                     print_lua_ret(self.lua_module.lua.load(&s).eval());
                 },
-                ConsoleMsg::Reload => self.lua_module.reload()?,
+                ConsoleMsg::Reload => self.lua_module.reload(),
                 _ => todo!("Console commands"),
             }
         }
 
         if self.watcher.try_recv().is_ok() {
-            self.lua_module.reload()?;
+            self.lua_module.reload();
         }
 
         let packet = self.lua_module.frame(&mut self.engine)?;

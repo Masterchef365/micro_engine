@@ -44,17 +44,21 @@ fn parse_command(s: String) -> ConsoleMsg {
 pub fn print_lua_ret(ret: mlua::Result<MultiValue>) {
     match ret {
         Ok(values) => {
-            println!(
+            console_print(&format!(
                 "\r{}",
                 values
                     .iter()
                     .map(|value| format!("{:?}", value))
                     .collect::<Vec<_>>()
                     .join("\t")
-            );
+            ));
         }
-        Err(e) => println!("error: {}", e),
+        Err(e) => console_print(&format!("error: {}", e)),
     }
+}
+
+pub fn console_print(s: &str) {
+    println!("{}", s);
     print!("{}", PROMPT);
     std::io::stdout().lock().flush().unwrap();
 }
