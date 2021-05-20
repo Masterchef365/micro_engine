@@ -1,7 +1,9 @@
-function init()
-    anim = 0.0
-    mesh = rainbow_cube()
-    key = add_mesh(mesh[1], mesh[2])
+function reload()
+    if anim == nil then anim = 0.0 end
+    if mesh == nil then 
+        data = rainbow_cube()
+        mesh = add_mesh(data[1], data[2])
+    end
 end
 
 function frame()
@@ -14,7 +16,7 @@ function frame()
                 math.sin(anim), 0., math.cos(anim), 0.,
                 0., math.sin(anim * 3.), 0., 1.,
             },
-            key,
+            mesh,
         },
         {
             {
@@ -23,7 +25,7 @@ function frame()
                 0., 0., 1., 0.,
                 3., 0., 0., 1.,
             },
-            key,
+            mesh,
         }
     }
 end

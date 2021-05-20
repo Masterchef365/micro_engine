@@ -5,7 +5,7 @@ use watertender::mainloop::PlatformEvent;
 use watertender::vertex::Vertex;
 use slotmap::Key;
 use slotmap::SlotMap;
-use std::{cell::RefCell, rc::Rc};
+use std::{path::PathBuf, cell::RefCell, rc::Rc};
 use watertender::vk::PrimitiveTopology;
 
 /// Lua code
@@ -13,7 +13,8 @@ pub struct LuaModule {
     new_data: Rc<RefCell<NewDataLua>>,
     my_shader: Option<Shader>, // TODO: Remove me!!
     pub lua: &'static Lua,
-    frame_fn: LuaFunction<'static>,
+    frame_fn: Option<LuaFunction<'static>>,
+    path: PathBuf,
 }
 
 /// Deferred operations on the engine (Can't/don't want to call engine directly...)
@@ -26,18 +27,8 @@ struct NewDataLua {
 }
 
 impl LuaModule {
-    pub fn new() -> Result<Self> {
-        let lua = Lua::new();
-        lua.load(&std::fs::read_to_string("./test_script.lua").context("Failed to load script")?)
-            .eval::<mlua::MultiValue>()
-            .map_err(|e| format_err!("{}", e))?;
-
-        let lua = lua.into_static();
-        let globals = lua.globals();
-
-        let frame_fn = globals
-            .get::<_, LuaFunction>("frame")
-            .expect("Requires frame fn"); // TODO: DON'T UNWRAP
+    pub fn new(path: PathBuf) -> Result<Self> {
+        let lua = Lua::new().into_static();
 
         let new_data = Rc::new(RefCell::new(NewDataLua::default()));
         let new_data_clone = new_data.clone();
@@ -57,18 +48,34 @@ impl LuaModule {
                     .as_ffi())
             })
             .unwrap();
-        globals.set("add_mesh", create_mesh_fn).unwrap();
+        lua.globals().set("add_mesh", create_mesh_fn).unwrap();
 
-        if let Ok(init_fn) = lua.globals().get::<_, LuaFunction>("init") {
-            init_fn.call::<(), ()>(()).unwrap(); // TODO: DON'T UNWRAP
-        }
-
-        Ok(LuaModule {
+        let mut instance = LuaModule {
+            path,
             lua,
-            frame_fn,
+            frame_fn: None,
             new_data,
             my_shader: None,
-        })
+        };
+
+        instance.reload()?;
+
+        Ok(instance)
+    }
+
+    pub fn reload(&mut self) -> Result<()> {
+        self.lua.load(&std::fs::read_to_string(&self.path).context("Failed to load script")?)
+            .eval::<mlua::MultiValue>()
+            .map_err(|e| format_err!("{}", e))?;
+
+        let globals = self.lua.globals();
+        let reload_fn = globals.get::<_, LuaFunction>("reload").expect("Requires reload() fn");
+        reload_fn.call::<(), ()>(()).unwrap();
+
+        let frame_fn = globals.get::<_, LuaFunction>("frame").expect("Requires frame() fn");
+        self.frame_fn = Some(frame_fn);
+
+        Ok(())
     }
 
     fn update_lua_data(&mut self, engine: &mut RenderEngine) -> Result<()> {
@@ -85,6 +92,7 @@ impl LuaModule {
     pub fn init(&mut self, engine: &mut RenderEngine) -> Result<()> {
         let mut new_data = self.new_data.borrow_mut();
 
+        // TODO: Move this literally anywhere else lol
         let my_shader = new_data.shaders.insert(());
         let fragment_src = &std::fs::read(r"shaders/unlit.frag.spv")?;
         let vertex_src = &std::fs::read(r"shaders/unlit.vert.spv")?;
@@ -100,7 +108,13 @@ impl LuaModule {
     }
 
     pub fn frame(&mut self, engine: &mut RenderEngine) -> Result<FramePacket> {
-        let table = self.frame_fn.call::<(), LuaTable>(()).unwrap(); // TODO: DON'T UNWRAP!
+        // Frame fn hasn't been installed yet...
+        let frame_fn = match self.frame_fn.as_ref() {
+            Some(f) => f,
+            None => return Ok(vec![]),
+        };
+
+        let table = frame_fn.call::<(), LuaTable>(()).unwrap(); // TODO: DON'T UNWRAP!
         self.update_lua_data(engine)?;
 
         let mut cmds = Vec::new();
