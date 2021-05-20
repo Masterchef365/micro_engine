@@ -1,8 +1,8 @@
+mod console;
 mod engine;
+mod file_watcher;
 mod lua_module;
 mod main_loop;
-mod console;
-mod file_watcher;
 use anyhow::Result;
 use main_loop::Main;
 use watertender::app_info::AppInfo;

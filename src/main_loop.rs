@@ -1,11 +1,11 @@
-use anyhow::{Result, Context};
-use crate::engine::RenderEngine;
-use watertender::prelude::*;
-use crate::lua_module::LuaModule;
-use std::sync::mpsc::{self, Receiver};
 use crate::console::{console as run_console, print_lua_ret, ConsoleMsg};
-use std::path::PathBuf;
+use crate::engine::RenderEngine;
 use crate::file_watcher::watch;
+use crate::lua_module::LuaModule;
+use anyhow::{Context, Result};
+use std::path::PathBuf;
+use std::sync::mpsc::{self, Receiver};
+use watertender::prelude::*;
 
 /// Top-level parts that run under the watertender Mainloop
 pub struct Main {
@@ -49,7 +49,7 @@ impl MainLoop for Main {
             match msg {
                 ConsoleMsg::Command(s) => {
                     print_lua_ret(self.lua_module.lua.load(&s).eval());
-                },
+                }
                 ConsoleMsg::Reset => todo!("Reset command"),
                 ConsoleMsg::Exit => platform.request_exit(),
                 ConsoleMsg::Reload => self.lua_module.reload(),

@@ -12,7 +12,7 @@ function gemm(a, b)
         for j=1, 4 do
             m = 0.0
             for k=1, 4 do
-                m = m + a[i][k] * b[k][j] 
+                m = m + a[k][j] * b[i][k] 
             end
             row[j] = m
         end

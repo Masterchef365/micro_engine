@@ -1,13 +1,13 @@
-use anyhow::{format_err, Result, Context};
-use crate::engine::{Mesh, RenderEngine, Shader, DrawCmd, FramePacket, Transform};
+use crate::console::console_print;
+use crate::engine::{DrawCmd, FramePacket, Mesh, RenderEngine, Shader, Transform};
+use anyhow::{format_err, Context, Result};
 use mlua::prelude::*;
-use watertender::mainloop::PlatformEvent;
-use watertender::vertex::Vertex;
 use slotmap::Key;
 use slotmap::SlotMap;
-use std::{path::PathBuf, cell::RefCell, rc::Rc};
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
+use watertender::mainloop::PlatformEvent;
+use watertender::vertex::Vertex;
 use watertender::vk::PrimitiveTopology;
-use crate::console::console_print;
 
 /// Lua code
 pub struct LuaModule {
@@ -64,7 +64,6 @@ impl LuaModule {
         Ok(instance)
     }
 
-
     pub fn reload(&mut self) {
         match self.try_reload() {
             Err(e) => console_print(&format!("Reload error: {}", e)),
@@ -73,15 +72,20 @@ impl LuaModule {
     }
 
     pub fn try_reload(&mut self) -> Result<()> {
-        self.lua.load(&std::fs::read_to_string(&self.path).context("Failed to load script")?)
+        self.lua
+            .load(&std::fs::read_to_string(&self.path).context("Failed to load script")?)
             .eval::<mlua::MultiValue>()
             .map_err(|e| format_err!("{}", e))?;
 
         let globals = self.lua.globals();
-        let reload_fn = globals.get::<_, LuaFunction>("reload").expect("Requires reload() fn");
+        let reload_fn = globals
+            .get::<_, LuaFunction>("reload")
+            .expect("Requires reload() fn");
         reload_fn.call::<(), ()>(()).unwrap();
 
-        let frame_fn = globals.get::<_, LuaFunction>("frame").expect("Requires frame() fn");
+        let frame_fn = globals
+            .get::<_, LuaFunction>("frame")
+            .expect("Requires frame() fn");
         self.frame_fn = Some(frame_fn);
 
         Ok(())
@@ -105,7 +109,12 @@ impl LuaModule {
         let my_shader = new_data.shaders.insert(());
         let fragment_src = &std::fs::read(r"shaders/unlit.frag.spv")?;
         let vertex_src = &std::fs::read(r"shaders/unlit.vert.spv")?;
-        engine.add_shader(vertex_src, fragment_src, PrimitiveTopology::TRIANGLE_LIST, my_shader)?;
+        engine.add_shader(
+            vertex_src,
+            fragment_src,
+            PrimitiveTopology::TRIANGLE_LIST,
+            my_shader,
+        )?;
 
         self.my_shader = Some(my_shader);
 
@@ -150,7 +159,7 @@ impl LuaModule {
             cmds.push(DrawCmd {
                 transform,
                 mesh,
-                shader: self.my_shader.unwrap()
+                shader: self.my_shader.unwrap(),
             })
         }
 

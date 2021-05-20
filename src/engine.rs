@@ -1,11 +1,11 @@
-use watertender::prelude::*;
-use defaults::FRAMES_IN_FLIGHT;
-use watertender::memory;
 use anyhow::Result;
+use defaults::FRAMES_IN_FLIGHT;
 use slotmap::{new_key_type, SecondaryMap};
+use watertender::memory;
+use watertender::prelude::*;
 
 // TODO: Make this expandable
-const MAX_TRANSFORMS: usize = 5000; 
+const MAX_TRANSFORMS: usize = 5000;
 
 new_key_type! {
     /// Handle for a Material (Draw commands)
@@ -62,18 +62,19 @@ impl RenderEngine {
     pub fn add_mesh(&mut self, vertices: &[Vertex], indices: &[u32], key: Mesh) -> Result<()> {
         // Mesh uploads
         let cmd = self.starter_kit.current_command_buffer();
-        let mesh = upload_mesh(
-            &mut self.starter_kit.staging_buffer,
-            cmd,
-            vertices,
-            indices,
-        )?;
+        let mesh = upload_mesh(&mut self.starter_kit.staging_buffer, cmd, vertices, indices)?;
         self.meshes.insert(key, mesh);
         Ok(())
     }
 
     /// Add a shader, or replace an existing one with the same name
-    pub fn add_shader(&mut self, vertex_spv: &[u8], fragment_spv: &[u8], topo: vk::PrimitiveTopology, key: Shader) -> Result<()> {
+    pub fn add_shader(
+        &mut self,
+        vertex_spv: &[u8],
+        fragment_spv: &[u8],
+        topo: vk::PrimitiveTopology,
+        key: Shader,
+    ) -> Result<()> {
         let pipeline = shader(
             &self.starter_kit.core,
             vertex_spv,
@@ -271,7 +272,6 @@ impl RenderEngine {
                     }
                 };
 
-
                 core.device.cmd_bind_pipeline(
                     command_buffer,
                     vk::PipelineBindPoint::GRAPHICS,
@@ -302,14 +302,8 @@ impl RenderEngine {
                     push_const.as_ptr() as _,
                 );
 
-                core.device.cmd_draw_indexed(
-                    command_buffer,
-                    mesh.n_indices,
-                    1,
-                    0,
-                    0,
-                    0,
-                );
+                core.device
+                    .cmd_draw_indexed(command_buffer, mesh.n_indices, 1, 0, 0, 0);
             }
         }
 

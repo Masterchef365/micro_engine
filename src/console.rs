@@ -1,7 +1,7 @@
 use mlua::MultiValue;
-use rustyline::Editor;
-use std::sync::mpsc::Sender;
+use rustyline::{config, EditMode, Editor};
 use std::io::Write;
+use std::sync::mpsc::Sender;
 
 pub enum ConsoleMsg {
     Command(String),
@@ -13,11 +13,13 @@ pub enum ConsoleMsg {
 const PROMPT: &str = "> ";
 
 pub fn console(tx: Sender<ConsoleMsg>) {
-    let mut editor = Editor::<()>::new();
+    let mut editor =
+        Editor::<()>::with_config(config::Builder::new().edit_mode(EditMode::Vi).build());
 
     loop {
         match editor.readline(PROMPT) {
             Ok(s) => {
+                editor.add_history_entry(&s);
                 let cmd = parse_command(s);
                 if let ConsoleMsg::Exit = cmd {
                     break;

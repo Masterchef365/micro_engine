@@ -14,7 +14,15 @@ function frame()
     anim = anim + 0.01
     return {
         {
-            cannon(gemm(rot_y(anim), translate(3, 0, 0))),
+            cannon(
+                gemm(
+                    translate(3, 0, 0), 
+                    gemm(
+                        rot_y(anim),
+                        translate(0, 4, 2)
+                    )
+                )
+            ),
             mesh,
         },
         {
