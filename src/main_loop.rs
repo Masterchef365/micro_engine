@@ -55,7 +55,7 @@ impl MainLoop for Main {
             }
         }
 
-        if self.watcher.try_recv().is_ok() {
+        if dbg!(self.watcher.try_recv()).is_ok() {
             self.lua_module.reload()?;
         }
 
