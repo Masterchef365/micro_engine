@@ -4,6 +4,9 @@ use watertender::memory;
 use anyhow::Result;
 use slotmap::{new_key_type, SecondaryMap};
 
+// TODO: Make this expandable
+const MAX_TRANSFORMS: usize = 5000; 
+
 new_key_type! {
     /// Handle for a Material (Draw commands)
     pub struct Shader;
@@ -12,73 +15,20 @@ new_key_type! {
     pub struct Mesh;
 }
 
-// TODO: Make this expandable
-const MAX_TRANSFORMS: usize = 5000; 
-
+/// Transform data in column-major format
 pub type Transform = [[f32; 4]; 4];
+
+/// A single object to be drawn
 pub struct DrawCmd {
     pub shader: Shader,
     pub mesh: Mesh,
-    /// Transform in column-major format
     pub transform: Transform,
 }
 
+/// A set of draw commands
 pub type FramePacket = Vec<DrawCmd>;
 
-pub trait UserCode {
-    fn init(&mut self, engine: &mut RenderEngine) -> Result<()>;
-    fn frame(&mut self, engine: &mut RenderEngine) -> Result<FramePacket>;
-    fn event(&mut self, engine: &mut RenderEngine, event: &PlatformEvent) -> Result<()>;
-}
-
-/// RenderEngine mainloop integration, usercode execution
-pub struct Main {
-    engine: RenderEngine,
-    user_code: Box<dyn UserCode>,
-}
-
-impl MainLoop for Main {
-    type Args = Box<dyn UserCode>;
-    fn new(core: &SharedCore, mut platform: Platform<'_>, mut user_code: Self::Args) -> Result<Self> {
-        let mut engine = RenderEngine::new(core, platform)?;
-        user_code.init(&mut engine)?;
-        Ok(Self {
-            engine,
-            user_code,
-        })
-    }
-
-    fn frame(
-        &mut self,
-        frame: Frame,
-        core: &SharedCore,
-        platform: Platform<'_>,
-    ) -> Result<PlatformReturn> {
-        let packet = self.user_code.frame(&mut self.engine)?;
-        self.engine.frame(frame, core, platform, packet)
-    }
-
-    fn swapchain_resize(&mut self, images: Vec<vk::Image>, extent: vk::Extent2D) -> Result<()> {
-        self.engine.swapchain_resize(images, extent)
-    }
-
-    fn event(
-        &mut self,
-        mut event: PlatformEvent<'_, '_>,
-        core: &Core,
-        mut platform: Platform<'_>,
-    ) -> Result<()> {
-        self.user_code.event(&mut self.engine, &event)?;
-        self.engine.event(event, core, platform)
-    }
-}
-
-impl SyncMainLoop for Main {
-    fn winit_sync(&self) -> (vk::Semaphore, vk::Semaphore) {
-        self.engine.winit_sync()
-    }
-}
-
+/// Rendering engine
 pub struct RenderEngine {
     shaders: SecondaryMap<Shader, vk::Pipeline>,
     meshes: SecondaryMap<Mesh, ManagedMesh>,
@@ -96,6 +46,7 @@ pub struct RenderEngine {
     starter_kit: StarterKit,
 }
 
+/// Scene data passed to shaders
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct SceneData {
@@ -131,13 +82,19 @@ impl RenderEngine {
             self.starter_kit.render_pass,
             self.pipeline_layout,
         )?;
-        self.shaders.insert(key, pipeline);
+        let maybe_old_pipeline = self.shaders.insert(key, pipeline);
+        unsafe {
+            let core = &self.starter_kit.core;
+            core.device.queue_wait_idle(core.queue).result()?;
+            core.device.destroy_pipeline(maybe_old_pipeline, None);
+        }
         Ok(())
     }
 }
 
 impl RenderEngine {
-    fn new(core: &SharedCore, mut platform: Platform<'_>) -> Result<Self> {
+    /// Initialize the engine
+    pub fn new(core: &SharedCore, mut platform: Platform<'_>) -> Result<Self> {
         let mut starter_kit = StarterKit::new(core.clone(), &mut platform)?;
 
         // Camera
@@ -266,7 +223,7 @@ impl RenderEngine {
         Ok(instance)
     }
 
-    fn frame(
+    pub fn frame(
         &mut self,
         frame: Frame,
         core: &SharedCore,
@@ -372,11 +329,11 @@ impl RenderEngine {
         Ok(ret)
     }
 
-    fn swapchain_resize(&mut self, images: Vec<vk::Image>, extent: vk::Extent2D) -> Result<()> {
+    pub fn swapchain_resize(&mut self, images: Vec<vk::Image>, extent: vk::Extent2D) -> Result<()> {
         self.starter_kit.swapchain_resize(images, extent)
     }
 
-    fn event(
+    pub fn event(
         &mut self,
         mut event: PlatformEvent<'_, '_>,
         _core: &Core,
@@ -387,7 +344,13 @@ impl RenderEngine {
         Ok(())
     }
 
-    fn winit_sync(&self) -> (vk::Semaphore, vk::Semaphore) {
+    pub fn winit_sync(&self) -> (vk::Semaphore, vk::Semaphore) {
         self.starter_kit.winit_sync()
+    }
+}
+
+impl Drop for RenderEngine {
+    fn drop(&mut self) {
+        // TODO: Drop code!!
     }
 }

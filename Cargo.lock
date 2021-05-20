@@ -1177,7 +1177,6 @@ dependencies = [
  "gpu-alloc-erupt",
  "nalgebra",
  "openxr",
- "slotmap",
  "winit",
 ]
 

@@ -1,16 +1,18 @@
 function init()
+    anim = 0.0
     mesh = rainbow_cube()
     key = add_mesh(mesh[1], mesh[2])
 end
 
 function frame()
+    anim = anim + 0.01
     return {
         {
             {
-                1., 0., 0., 0.,
+                math.cos(anim), 0., -math.sin(anim), 0.,
                 0., 1., 0., 0.,
-                0., 0., 1., 0.,
-                0., 0., 0., 1.,
+                math.sin(anim), 0., math.cos(anim), 0.,
+                0., math.sin(anim * 3.), 0., 1.,
             },
             key,
         },
