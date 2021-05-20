@@ -148,7 +148,14 @@ impl LuaModule {
             let table: LuaTable = cmd.unwrap();
             let mut transform: Transform = [[0.0f32; 4]; 4];
 
-            let in_trans: Vec<f32> = table.get(1).unwrap();
+            let in_trans: Vec<f32> = match table.get(1) {
+                Err(e) => {
+                    console_print(&format!("Frame error: {}", e));
+                    self.frame_fn = None;
+                    return Ok(vec![]);
+                }
+                Ok(i) => i,
+            };
             for (i, o) in in_trans.chunks_exact(4).zip(transform.iter_mut()) {
                 o.copy_from_slice(&i[..]);
             }
