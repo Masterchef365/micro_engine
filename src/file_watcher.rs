@@ -1,26 +1,31 @@
-use notify::{Event, RecommendedWatcher, RecursiveMode, Result, Watcher};
+use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::path::Path;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{channel, Sender};
+use std::time::Duration;
 
 pub fn watch(file: impl AsRef<Path>, tx: Sender<()>) {
-    let path_buf = file.as_ref().to_path_buf();
-    let mut watcher: RecommendedWatcher =
-        Watcher::new_immediate(move |res: Result<Event>| match res {
-            Ok(event) => {
-                if event.paths.contains(&path_buf) {
-                    tx.send(()).expect("Watcher failed to send");
-                }
-            }
-            Err(e) => println!("watch error: {:?}", e),
-        })
-        .expect("Failed to init watcher");
+    let (notif_tx, notif_rx) = channel();
+    let mut watcher = watcher(notif_tx, Duration::from_millis(100)).unwrap();
     let cannon = file
         .as_ref()
         .canonicalize()
         .expect("Failed to canonicalize");
+
     let parent = cannon.parent().expect("File has no parent");
-    println!("{:?}", parent);
-    watcher
-        .watch(parent, RecursiveMode::NonRecursive)
-        .expect("Failed to start watcher");
+
+    watcher.watch(parent, RecursiveMode::NonRecursive).unwrap();
+
+    loop {
+        match notif_rx.recv() {
+            Ok(DebouncedEvent::Write(b))
+            | Ok(DebouncedEvent::Create(b))
+            | Ok(DebouncedEvent::NoticeWrite(b)) => {
+                if b == cannon {
+                    tx.send(()).expect("Watcher failed to send");
+                }
+            }
+            Err(e) => println!("watch error: {:?}", e),
+            _ => (),
+        }
+    }
 }
