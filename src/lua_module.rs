@@ -12,7 +12,7 @@ use watertender::vk::PrimitiveTopology;
 pub struct LuaModule {
     new_data: Rc<RefCell<NewDataLua>>,
     my_shader: Option<Shader>, // TODO: Remove me!!
-    lua: &'static Lua,
+    pub lua: &'static Lua,
     frame_fn: LuaFunction<'static>,
 }
 

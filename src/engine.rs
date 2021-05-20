@@ -95,7 +95,7 @@ impl RenderEngine {
 impl RenderEngine {
     /// Initialize the engine
     pub fn new(core: &SharedCore, mut platform: Platform<'_>) -> Result<Self> {
-        let mut starter_kit = StarterKit::new(core.clone(), &mut platform)?;
+        let starter_kit = StarterKit::new(core.clone(), &mut platform)?;
 
         // Camera
         let camera = MultiPlatformCamera::new(&mut platform);

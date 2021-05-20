@@ -3,7 +3,7 @@ use crate::engine::RenderEngine;
 use watertender::prelude::*;
 use crate::lua_module::LuaModule;
 use std::sync::mpsc::{self, Receiver};
-use crate::console::{console as run_console, ConsoleMsg};
+use crate::console::{console as run_console, print_lua_ret, ConsoleMsg};
 
 /// Top-level parts that run under the watertender Mainloop
 pub struct Main {
@@ -35,6 +35,15 @@ impl MainLoop for Main {
         core: &SharedCore,
         platform: Platform<'_>,
     ) -> Result<PlatformReturn> {
+        for msg in self.console.try_iter() {
+            match msg {
+                ConsoleMsg::Command(s) => {
+                    print_lua_ret(self.lua_module.lua.load(&s).eval());
+                },
+                _ => todo!("Console commands"),
+            }
+        }
+
         let packet = self.lua_module.frame(&mut self.engine)?;
         self.engine.frame(frame, core, platform, packet)
     }
