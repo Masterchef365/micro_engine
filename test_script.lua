@@ -1,3 +1,7 @@
+dofile("lin_alg.lua")
+
+objs = {}
+
 function reload()
     if anim == nil then anim = 0.0 end
     if mesh == nil then 
@@ -10,23 +14,14 @@ function frame()
     anim = anim + 0.01
     return {
         {
-            {
-                math.cos(anim), 0., -math.sin(anim), 0.,
-                0., 1., 0., 0.,
-                math.sin(anim), 0., math.cos(anim), 0.,
-                0., math.sin(anim * 3.), 0., 1.,
-            },
+            cannon(gemm(rot_y(anim), translate(3, 0, 0))),
             mesh,
         },
         {
-            {
-                1., 0., 0., 0.,
-                0., 1., 0., 0.,
-                0., 0., 1., 0.,
-                3., 0., 0., 1.,
-            },
+            cannon(identity),
             mesh,
-        }
+        },
+        table.unpack(objs)
     }
 end
 

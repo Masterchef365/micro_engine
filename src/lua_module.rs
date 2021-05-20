@@ -138,10 +138,12 @@ impl LuaModule {
         for cmd in table.sequence_values() {
             let table: LuaTable = cmd.unwrap();
             let mut transform: Transform = [[0.0f32; 4]; 4];
+
             let in_trans: Vec<f32> = table.get(1).unwrap();
             for (i, o) in in_trans.chunks_exact(4).zip(transform.iter_mut()) {
                 o.copy_from_slice(&i[..]);
             }
+
             let mesh_id: u64 = table.get(2).unwrap(); // TODO: Use Lua LightUserData or something
             let mesh = Mesh::from(slotmap::KeyData::from_ffi(mesh_id));
 

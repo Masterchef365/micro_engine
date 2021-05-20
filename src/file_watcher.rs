@@ -20,7 +20,7 @@ pub fn watch(file: impl AsRef<Path>, tx: Sender<()>) {
             Ok(DebouncedEvent::Write(b))
             | Ok(DebouncedEvent::Create(b))
             | Ok(DebouncedEvent::NoticeWrite(b)) => {
-                if b == cannon {
+                if b.extension() == Some(std::ffi::OsStr::new("lua")) {
                     tx.send(()).expect("Watcher failed to send");
                 }
             }
