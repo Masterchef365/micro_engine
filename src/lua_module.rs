@@ -27,6 +27,10 @@ struct NewDataLua {
     added_shaders: Vec<(Shader, String, String, PrimitiveTopology)>,
 }
 
+fn lua_err(e: mlua::Error) -> anyhow::Error {
+    format_err!("Lua error: {}", e)
+}
+
 impl LuaModule {
     pub fn new(path: PathBuf) -> Result<Self> {
         let lua = Lua::new().into_static();
@@ -48,8 +52,8 @@ impl LuaModule {
                     .data()
                     .as_ffi())
             })
-            .unwrap();
-        lua.globals().set("add_mesh", create_mesh_fn).unwrap();
+            .map_err(lua_err)?;
+        lua.globals().set("add_mesh", create_mesh_fn).map_err(lua_err)?;
 
         let mut instance = LuaModule {
             path,
@@ -72,20 +76,28 @@ impl LuaModule {
     }
 
     pub fn try_reload(&mut self) -> Result<()> {
+        // Keep users from shooting themselves in the foot, by deleting the content which is always
+        // expected to be there _before_ loading their new code. This means that if they renamed
+        // the function, it will no longer be there.
+        let globals = self.lua.globals();
+        globals.set("reload", mlua::Value::Nil).map_err(lua_err)?;
+        globals.set("frame", mlua::Value::Nil).map_err(lua_err)?;
+
         self.lua
             .load(&std::fs::read_to_string(&self.path).context("Failed to load script")?)
             .eval::<mlua::MultiValue>()
             .map_err(|e| format_err!("{}", e))?;
 
+        // Load functions used repeatedly
         let globals = self.lua.globals();
         let reload_fn = globals
             .get::<_, LuaFunction>("reload")
-            .expect("Requires reload() fn");
-        reload_fn.call::<(), ()>(()).unwrap();
+            .map_err(lua_err).context("Requires reload() fn")?;
+        reload_fn.call::<(), ()>(()).map_err(lua_err)?;
 
         let frame_fn = globals
             .get::<_, LuaFunction>("frame")
-            .expect("Requires frame() fn");
+            .map_err(lua_err).context("Requires frame() fn")?;
         self.frame_fn = Some(frame_fn);
 
         Ok(())
@@ -125,48 +137,55 @@ impl LuaModule {
         Ok(())
     }
 
+    /// For recoverable script errors
+    fn fail_freeze_frame<E: std::fmt::Display>(&mut self, err: E) -> Result<FramePacket> {
+        console_print(&format!("Error in frame(), stopping until reload: {}", err));
+        self.frame_fn = None;
+        Ok(vec![])
+    }
+
     pub fn frame(&mut self, engine: &mut RenderEngine) -> Result<FramePacket> {
-        // Frame fn hasn't been installed yet...
+        // If frame fn hasn't been installed yet, do nothing 
         let frame_fn = match self.frame_fn.as_ref() {
             Some(f) => f,
             None => return Ok(vec![]),
         };
 
+        // Call frame function
         let table = match frame_fn.call::<(), LuaTable>(()) {
-            Err(e) => {
-                console_print(&format!("Frame error: {}", e));
-                self.frame_fn = None;
-                return Ok(vec![]);
-            }
+            Err(e) => return self.fail_freeze_frame(e),
             Ok(t) => t,
         };
 
         self.update_lua_data(engine)?;
 
+        // Read draw commands
         let mut cmds = Vec::new();
         for cmd in table.sequence_values() {
-            let table: LuaTable = cmd.unwrap();
-            let mut transform: Transform = [[0.0f32; 4]; 4];
+            // Read the drawcmd's table
+            let table: LuaTable = cmd.map_err(lua_err)?;
 
+            // Read transform data from the table
+            let mut transform: Transform = [[0.0f32; 4]; 4];
             let in_trans: Vec<f32> = match table.get(1) {
-                Err(e) => {
-                    console_print(&format!("Frame error: {}", e));
-                    self.frame_fn = None;
-                    return Ok(vec![]);
-                }
+                Err(e) => return self.fail_freeze_frame(format!("Transform matrix is not a flat array; {}", e)),
                 Ok(i) => i,
             };
             for (i, o) in in_trans.chunks_exact(4).zip(transform.iter_mut()) {
                 o.copy_from_slice(&i[..]);
             }
 
-            let mesh_id: u64 = table.get(2).unwrap(); // TODO: Use Lua LightUserData or something
+            // Read mesh id from the table
+            let mesh_id: u64 = match table.get(2) {
+                Err(e) => return self.fail_freeze_frame(format!("No mesh found; {}", e)),
+                Ok(m) => m,
+            };
             let mesh = Mesh::from(slotmap::KeyData::from_ffi(mesh_id));
 
             cmds.push(DrawCmd {
                 transform,
                 mesh,
-                shader: self.my_shader.unwrap(),
+                shader: self.my_shader.expect("TODO: Replace me with real shader infrastructure!"),
             })
         }
 
