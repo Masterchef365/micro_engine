@@ -345,6 +345,13 @@ impl RenderEngine {
 
 impl Drop for RenderEngine {
     fn drop(&mut self) {
-        // TODO: Drop code!!
+        unsafe {
+            self.starter_kit.core.device.destroy_descriptor_pool(Some(self.descriptor_pool), None);
+            self.starter_kit.core.device.destroy_descriptor_set_layout(Some(self.descriptor_set_layout), None);
+            self.starter_kit.core.device.destroy_pipeline_layout(Some(self.pipeline_layout), None);
+            for (_, pipeline) in self.shaders.drain() {
+                self.starter_kit.core.device.destroy_pipeline(Some(pipeline), None);
+            }
+        }
     }
 }

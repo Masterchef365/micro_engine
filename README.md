@@ -7,14 +7,17 @@ A very WIP scriptable game and visualization framework
 - [x] Add some meshes with a script
 - [x] Hotload script
 - [x] Interactive prompt 
+- [x] Better error handling
 - [ ] More primitives for scripts (Lines, Points, ...)
 - [ ] Keyboard input
 - [ ] Text
 - [ ] Window dimensions
 - [ ] Mouse input
 - [ ] LightUserData for slotmap keys/handles in LUA
+- [ ] Textures
 - [ ] Hotload shaders
 - [ ] Multiple scripts/prompt switching
+- [ ] Dynamic meshes
 
 # LUA interface for rendering, very simple:
 Functions your scripts may have:
@@ -48,6 +51,7 @@ Functions you can call:
         * This would be so that recursive mode doesn't track too many files - because whatever path you pass to `add_shader()` would be the update path
         * Maybe the same for dofile - we do an alias to the original function, but add the tracking behaviour? "Magic" - or maybe an `reload list` spamming the paths of the files that have updated _AND_ previously requested by LUA during this session. 
     * Make the scripts able to trigger reload on their own and/or an ipc mechanism to add this as an addon and allow for more elaborate innovation
+* Gpu-driven rendering, configurable from Lua...
 
 # Moonshot ideas
 * Different levels of scripting:

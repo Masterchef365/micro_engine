@@ -29,7 +29,7 @@ fn watch_internal(file: impl AsRef<Path>, tx: Sender<()>) -> Result<()> {
             | Ok(DebouncedEvent::Create(b))
             | Ok(DebouncedEvent::NoticeWrite(b)) => {
                 if b.extension() == Some(std::ffi::OsStr::new("lua")) {
-                    tx.send(()).expect("Watcher failed to send");
+                    tx.send(())?;
                 }
             }
             Err(e) => println!("watch error: {:?}", e),

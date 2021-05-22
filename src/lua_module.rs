@@ -24,7 +24,7 @@ struct NewDataLua {
     meshes: SlotMap<Mesh, ()>,
     shaders: SlotMap<Shader, ()>,
     added_meshes: Vec<(Mesh, Vec<Vertex>, Vec<u32>)>,
-    added_shaders: Vec<(Shader, String, String, PrimitiveTopology)>,
+    //added_shaders: Vec<(Shader, String, String, PrimitiveTopology)>,
 }
 
 fn lua_err(e: mlua::Error) -> anyhow::Error {
@@ -203,7 +203,7 @@ impl NewDataLua {
         self.added_meshes.push((key, vertices, indices));
         key
     }
-
+    /*
     pub fn add_shader(
         &mut self,
         vertex_src: String,
@@ -214,4 +214,5 @@ impl NewDataLua {
         self.added_shaders.push((key, vertex_src, index_src, topo));
         key
     }
+    */
 }
