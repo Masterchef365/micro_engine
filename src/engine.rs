@@ -15,6 +15,9 @@ new_key_type! {
     pub struct Mesh;
 }
 
+impl mlua::UserData for Shader {}
+impl mlua::UserData for Mesh {}
+
 /// Transform data in column-major format
 pub type Transform = [[f32; 4]; 4];
 

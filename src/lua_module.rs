@@ -2,7 +2,6 @@ use crate::console::console_print;
 use crate::engine::{DrawCmd, FramePacket, Mesh, RenderEngine, Shader, Transform};
 use anyhow::{format_err, Context, Result};
 use mlua::prelude::*;
-use slotmap::Key;
 use slotmap::SlotMap;
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 use watertender::mainloop::PlatformEvent;
@@ -48,9 +47,7 @@ impl LuaModule {
                     .collect();
                 Ok(new_data_clone
                     .borrow_mut()
-                    .add_mesh(vertices, indices)
-                    .data()
-                    .as_ffi())
+                    .add_mesh(vertices, indices))
             })
             .map_err(lua_err)?;
         lua.globals().set("add_mesh", create_mesh_fn).map_err(lua_err)?;
@@ -176,11 +173,10 @@ impl LuaModule {
             }
 
             // Read mesh id from the table
-            let mesh_id: u64 = match table.get(2) {
+            let mesh: Mesh = match table.get(2) {
                 Err(e) => return self.fail_freeze_frame(format!("No mesh found; {}", e)),
                 Ok(m) => m,
             };
-            let mesh = Mesh::from(slotmap::KeyData::from_ffi(mesh_id));
 
             cmds.push(DrawCmd {
                 transform,

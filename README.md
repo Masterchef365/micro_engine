@@ -8,12 +8,12 @@ A very WIP scriptable game and visualization framework
 - [x] Hotload script
 - [x] Interactive prompt 
 - [x] Better error handling
+- [x] LightUserData for slotmap keys/handles in LUA
 - [ ] More primitives for scripts (Lines, Points, ...)
 - [ ] Keyboard input
 - [ ] Text
 - [ ] Window dimensions
 - [ ] Mouse input
-- [ ] LightUserData for slotmap keys/handles in LUA
 - [ ] Textures
 - [ ] Hotload shaders
 - [ ] Multiple scripts/prompt switching
