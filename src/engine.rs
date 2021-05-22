@@ -235,7 +235,7 @@ impl RenderEngine {
 
         // Collect and write transforms
         let mut positions: Vec<Transform> = packet.iter().map(|cmd| cmd.transform).collect();
-        if positions.len() >= MAX_TRANSFORMS {
+        if positions.len() > MAX_TRANSFORMS {
             eprintln!("Too many positions!");
             positions.truncate(MAX_TRANSFORMS);
         }

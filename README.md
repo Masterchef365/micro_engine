@@ -7,6 +7,7 @@ A very WIP scriptable game and visualization framework
 - [x] Add some meshes with a script
 - [x] Hotload script
 - [x] Interactive prompt 
+- [ ] More primitives for scripts (Lines, Points, ...)
 - [ ] Hotload shaders
 - [ ] Multiple scripts/prompt switching
 
