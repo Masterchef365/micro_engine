@@ -65,6 +65,12 @@ impl LuaModule {
         Ok(instance)
     }
 
+    pub fn reset(&mut self) -> Result<()> {
+        *self = LuaModule::new(self.path.clone())?;
+        self.reload();
+        Ok(())
+    }
+
     pub fn reload(&mut self) {
         match self.try_reload() {
             Err(e) => console_print(&format!("Reload error: {}", e)),

@@ -9,8 +9,9 @@ A very WIP scriptable game and visualization framework
 - [x] Interactive prompt 
 - [x] Better error handling
 - [x] LightUserData for slotmap keys/handles in LUA
-- [ ] More primitives for scripts (Lines, Points, ...)
+- [ ] Reset function
 - [ ] Keyboard input
+- [ ] More primitives for scripts (Lines, Points, ...)
 - [ ] Text
 - [ ] Window dimensions
 - [ ] Mouse input

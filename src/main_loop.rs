@@ -50,7 +50,7 @@ impl MainLoop for Main {
                 ConsoleMsg::Command(s) => {
                     print_lua_ret(self.lua_module.lua.load(&s).eval());
                 }
-                ConsoleMsg::Reset => todo!("Reset command"),
+                ConsoleMsg::Reset => self.lua_module.reset()?,
                 ConsoleMsg::Exit => platform.request_exit(),
                 ConsoleMsg::Reload => self.lua_module.reload(),
             }
