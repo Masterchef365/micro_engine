@@ -8,6 +8,11 @@ A very WIP scriptable game and visualization framework
 - [x] Hotload script
 - [x] Interactive prompt 
 - [ ] More primitives for scripts (Lines, Points, ...)
+- [ ] Keyboard input
+- [ ] Text
+- [ ] Window dimensions
+- [ ] Mouse input
+- [ ] LightUserData for slotmap keys/handles in LUA
 - [ ] Hotload shaders
 - [ ] Multiple scripts/prompt switching
 
@@ -37,10 +42,12 @@ Functions you can call:
 * Extra math library for LUA
 
 # Thoughts
-* Do scripts run in their own namespaces? 
-    * If so, which namespace is the prompt on? 
-    * Do I need something like an enter/exit for prompts? 
-        * It would looke like `myscript> ` when inside a script - it would also be cool to just do a global table and then individual scripts... Hmm... Or maybe you can just do it simpler - one global namespace and then a bunch of scripts
+* How will we track shader and script updates, when dofile() and require() are the preferred methods to pull in other code? 
+    * We could search the files for those commands, but the problem is that there can be misdirections (variables in dofile, consts in include probably)
+    * Have just dedicated "shader" and "script" folders. 
+        * This would be so that recursive mode doesn't track too many files - because whatever path you pass to `add_shader()` would be the update path
+        * Maybe the same for dofile - we do an alias to the original function, but add the tracking behaviour? "Magic" - or maybe an `reload list` spamming the paths of the files that have updated _AND_ previously requested by LUA during this session. 
+    * Make the scripts able to trigger reload on their own and/or an ipc mechanism to add this as an addon and allow for more elaborate innovation
 
 # Moonshot ideas
 * Different levels of scripting:
