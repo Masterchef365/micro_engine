@@ -36,6 +36,8 @@ impl LuaModule {
 
         let new_data = Rc::new(RefCell::new(NewDataLua::default()));
         let new_data_clone = new_data.clone();
+        
+        // Mesh creator function
         let create_mesh_fn = lua
             .create_function(move |_, (vertices, indices): (Vec<f32>, Vec<u32>)| {
                 let vertices = vertices

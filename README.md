@@ -53,6 +53,8 @@ Functions you can call:
         * Maybe the same for dofile - we do an alias to the original function, but add the tracking behaviour? "Magic" - or maybe an `reload list` spamming the paths of the files that have updated _AND_ previously requested by LUA during this session. 
     * Make the scripts able to trigger reload on their own and/or an ipc mechanism to add this as an addon and allow for more elaborate innovation
 * Gpu-driven rendering, configurable from Lua...
+* I should provide some way of getting the camera pose from within Lua, but it should never really need to set the camera positions...? Oh wait...
+    * Okay, so there will be a "Pre" transform given to each portal view.
 
 # Moonshot ideas
 * Different levels of scripting:
