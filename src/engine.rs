@@ -89,8 +89,10 @@ impl RenderEngine {
         let maybe_old_pipeline = self.shaders.insert(key, pipeline);
         unsafe {
             let core = &self.starter_kit.core;
-            core.device.queue_wait_idle(core.queue).result()?;
-            core.device.destroy_pipeline(maybe_old_pipeline, None);
+            if maybe_old_pipeline.is_some() {
+                core.device.queue_wait_idle(core.queue).result()?;
+                core.device.destroy_pipeline(maybe_old_pipeline, None);
+            }
         }
         Ok(())
     }
