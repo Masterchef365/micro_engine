@@ -23,36 +23,45 @@ struct NewDataLua {
     meshes: SlotMap<Mesh, ()>,
     shaders: SlotMap<Shader, ()>,
     added_meshes: Vec<(Mesh, Vec<Vertex>, Vec<u32>)>,
-    //added_shaders: Vec<(Shader, String, String, PrimitiveTopology)>,
+    added_shaders: Vec<(Shader, String, String, PrimitiveTopology)>,
 }
 
 fn lua_err(e: mlua::Error) -> anyhow::Error {
     format_err!("Lua error: {}", e)
 }
 
+
 impl LuaModule {
     pub fn new(path: PathBuf) -> Result<Self> {
         let lua = Lua::new().into_static();
 
+        // TODO: Use scoped functions!
         let new_data = Rc::new(RefCell::new(NewDataLua::default()));
-        let new_data_clone = new_data.clone();
         
         // Mesh creator function
+        let new_data_clone = new_data.clone();
         let create_mesh_fn = lua
             .create_function(move |_, (vertices, indices): (Vec<f32>, Vec<u32>)| {
-                let vertices = vertices
-                    .chunks_exact(6)
-                    .map(|chunk| Vertex {
-                        pos: [chunk[0], chunk[1], chunk[2]],
-                        color: [chunk[3], chunk[4], chunk[5]],
-                    })
-                    .collect();
                 Ok(new_data_clone
                     .borrow_mut()
                     .add_mesh(vertices, indices))
             })
             .map_err(lua_err)?;
         lua.globals().set("add_mesh", create_mesh_fn).map_err(lua_err)?;
+ 
+        // Shader creator function
+        let new_data_clone = new_data.clone();
+        let create_mesh_fn = lua
+            .create_function(move |_, (vert_path, frag_path, primitive): (String, String, String)| {
+                Ok(new_data_clone
+                    .borrow_mut()
+                    .track_shader(vert_path, frag_path, primitive)
+                    .map_err(|e| mlua::Error::external(e))
+                )
+            })
+            .map_err(lua_err)?;
+        lua.globals().set("track_shader", create_mesh_fn).map_err(lua_err)?;
+
 
         let mut instance = LuaModule {
             path,
@@ -202,21 +211,36 @@ impl LuaModule {
 }
 
 impl NewDataLua {
-    pub fn add_mesh(&mut self, vertices: Vec<Vertex>, indices: Vec<u32>) -> Mesh {
+    pub fn add_mesh(&mut self, vertices: Vec<f32>, indices: Vec<u32>) -> Mesh {
+        let vertices = vertices
+            .chunks_exact(6)
+            .map(|chunk| Vertex {
+                pos: [chunk[0], chunk[1], chunk[2]],
+                color: [chunk[3], chunk[4], chunk[5]],
+            })
+            .collect();
         let key = self.meshes.insert(());
         self.added_meshes.push((key, vertices, indices));
         key
     }
-    /*
-    pub fn add_shader(
+
+    pub fn track_shader(
         &mut self,
-        vertex_src: String,
-        index_src: String,
-        topo: PrimitiveTopology,
-    ) -> Shader {
+        vertex_path: String,
+        index_path: String,
+        primitive: String,
+    ) -> Result<Shader, String> {
+        let primitive = match primitive.to_lowercase().as_str() {
+            "triangles" | "tri" => PrimitiveTopology::TRIANGLE_LIST,
+            "points" => PrimitiveTopology::POINT_LIST,
+            "lines" => PrimitiveTopology::LINE_LIST,
+            _ => return Err(format!("Unrecognized primitive type {}", primitive)),
+        };
+
+        dbg!(&vertex_path, &index_path, &primitive);
+
         let key = self.shaders.insert(());
-        self.added_shaders.push((key, vertex_src, index_src, topo));
-        key
+        self.added_shaders.push((key, vertex_path, index_path, primitive));
+        Ok(key)
     }
-    */
 }
