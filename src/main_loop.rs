@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
 use watertender::prelude::*;
-use crate::shader_update_calc::ShaderUpdateCalculator;
+use crate::shader_update_calc::{ShaderUpdateCalculator, compile_jobs};
 use shaderc::Compiler;
 
 /// Top-level parts that run under the watertender Mainloop
@@ -23,6 +23,7 @@ impl MainLoop for Main {
     fn new(core: &SharedCore, platform: Platform<'_>) -> Result<Self> {
         let mut args = std::env::args().skip(1);
         let lua_path = args.next().context("Requires lua path arg")?;
+        let watch_path = args.next().unwrap_or(".".into());
 
         let engine = RenderEngine::new(core, platform)?;
         let lua_module = LuaModule::new(PathBuf::from(&lua_path))?;
@@ -31,7 +32,7 @@ impl MainLoop for Main {
         std::thread::spawn(move || run_console(console_tx));
 
         let (watcher_tx, watcher) = mpsc::channel();
-        std::thread::spawn(move || watch(lua_path, watcher_tx));
+        std::thread::spawn(move || watch(watch_path, watcher_tx));
 
         let compiler = Compiler::new().context("Failed to init shaderc")?;
         let shader_update_calc = ShaderUpdateCalculator::new();
@@ -46,7 +47,7 @@ impl MainLoop for Main {
         };
 
         // Handle new shaders and meshes
-        instance.handle_lua_updates();
+        instance.handle_lua_updates()?;
 
         Ok(instance)
     }
@@ -76,9 +77,7 @@ impl MainLoop for Main {
             match path.extension().and_then(|s| s.to_str()) {
                 Some("lua") => do_lua_reload = true,
                 Some("frag" | "vert") => {
-                    if let Some(path) = path.to_str() {
-                        self.shader_update_calc.shader_file_touched(path);
-                    } 
+                    self.shader_update_calc.shader_file_touched(&path.canonicalize()?);
                     // TODO: else error? It would happen somewhat often...
                 }
                 _ => (),
@@ -91,7 +90,7 @@ impl MainLoop for Main {
         }
 
         // Handle new shaders and meshes
-        self.handle_lua_updates();
+        self.handle_lua_updates()?;
 
         // Get render packet
         let packet = self.lua_module.frame()?;
@@ -119,11 +118,11 @@ impl Main {
     pub fn handle_lua_updates(&mut self) -> Result<()> {
         let (added_meshes, tracked_shaders) = self.lua_module.dump_render_updates();
         for (shader, unique) in tracked_shaders {
-            self.shader_update_calc.track_shader(shader, unique);
+            self.shader_update_calc.track_shader(shader, unique)?;
         }
 
         let updates = self.shader_update_calc.updates();
-        compile_jobs(&mut self.compiler, &updates, &mut self.engine);
+        compile_jobs(&mut self.compiler, &updates, &mut self.engine)?;
 
         for (mesh, (verts, indices)) in added_meshes {
             self.engine.add_mesh(&verts, &indices, mesh)?;
@@ -136,46 +135,5 @@ impl Main {
 impl SyncMainLoop for Main {
     fn winit_sync(&self) -> (vk::Semaphore, vk::Semaphore) {
         self.engine.winit_sync()
-    }
-}
-
-use std::collections::{HashSet, HashMap};
-use crate::shader_update_calc::UniquePipeline;
-use crate::engine::Shader;
-use shaderc::{ShaderKind, CompilationArtifact};
-fn compile_jobs(compiler: &mut Compiler, jobs: &[(Shader, UniquePipeline)], engine: &mut RenderEngine) -> Result<()> {
-    let mut fragment_artefacts: HashMap<String, Option<CompilationArtifact>> = HashMap::new();
-    let mut vertex_artefacts: HashMap<String, Option<CompilationArtifact>> = HashMap::new();
-    for (shader, paths) in jobs {
-        let vertex = vertex_artefacts
-            .entry(paths.vertex_path.clone())
-            .or_insert_with(|| compile_nice(compiler, &paths.vertex_path, ShaderKind::Vertex));
-        let fragment = fragment_artefacts
-            .entry(paths.fragment_path.clone())
-            .or_insert_with(|| compile_nice(compiler, &paths.fragment_path, ShaderKind::Fragment));
-        if let Some((vertex, fragment)) = vertex.as_ref().zip(fragment.as_ref()) {
-            engine.add_shader(&vertex.as_binary_u8(), fragment.as_binary_u8(), paths.primitive, *shader)?;
-        }
-    }
-
-    Ok(())
-}
-
-fn compile_nice(compiler: &mut Compiler, path: &str, kind: ShaderKind) -> Option<CompilationArtifact> {
-    let src = match std::fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("Failed to load shader source at path \"{}\"", path);
-            return None;
-        }
-    };
-
-    let res = compiler.compile_into_spirv(&src, kind, path, "main", None);
-    match res {
-        Ok(art) => Some(art),
-        Err(e) => {
-            eprintln!("Failed to compile shader at path \"{}\"; {}", path, e);
-            None
-        }
     }
 }

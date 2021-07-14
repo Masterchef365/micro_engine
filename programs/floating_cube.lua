@@ -5,6 +5,7 @@ function reload()
     if init == nil then
         anim = 0.0
         mesh = add_mesh(table.unpack(rainbow_cube()))
+        shader = track_shader("shaders/unlit.vert", "shaders/unlit.frag", "tri")
         init = true
     end
 end
@@ -18,10 +19,12 @@ function frame()
                 rot_y(anim)
             )),
             mesh,
+            shader,
         },
         {
             cannon(translate(3, 0, 0)),
             mesh,
+            shader,
         },
     }
 end
