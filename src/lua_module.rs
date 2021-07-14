@@ -7,11 +7,11 @@ use std::{cell::RefCell, path::PathBuf, rc::Rc};
 use watertender::mainloop::PlatformEvent;
 use watertender::vertex::Vertex;
 use watertender::vk::PrimitiveTopology;
+use crate::shader_update_calc::UniquePipeline;
 
 /// Lua code
 pub struct LuaModule {
     new_data: Rc<RefCell<NewDataLua>>,
-    my_shader: Option<Shader>, // TODO: Remove me!!
     pub lua: &'static Lua,
     frame_fn: Option<LuaFunction<'static>>,
     path: PathBuf,
@@ -20,16 +20,19 @@ pub struct LuaModule {
 /// Deferred operations on the engine (Can't/don't want to call engine directly...)
 #[derive(Default)]
 struct NewDataLua {
+    /// This is where the key for the mesh comes from in the entire program; these handles link the
+    /// Lua data to the engine data.
     meshes: SlotMap<Mesh, ()>,
     shaders: SlotMap<Shader, ()>,
-    added_meshes: Vec<(Mesh, Vec<Vertex>, Vec<u32>)>,
-    added_shaders: Vec<(Shader, String, String, PrimitiveTopology)>,
+    added_meshes: Vec<(Mesh, MeshData)>,
+    tracked_shaders: Vec<(Shader, UniquePipeline)>,
 }
 
 fn lua_err(e: mlua::Error) -> anyhow::Error {
     format_err!("Lua error: {}", e)
 }
 
+pub type MeshData = (Vec<Vertex>, Vec<u32>);
 
 impl LuaModule {
     pub fn new(path: PathBuf) -> Result<Self> {
@@ -68,7 +71,6 @@ impl LuaModule {
             lua,
             frame_fn: None,
             new_data,
-            my_shader: None,
         };
 
         instance.reload();
@@ -117,38 +119,13 @@ impl LuaModule {
         Ok(())
     }
 
-    fn update_lua_data(&mut self, engine: &mut RenderEngine) -> Result<()> {
+    /// Dump render updates accumulated during Lua callbacks (such as frame() and reload()).
+    pub fn dump_render_updates(&mut self) -> (Vec<(Mesh, MeshData)>, Vec<(Shader, UniquePipeline)>) {
         let mut new_data = self.new_data.borrow_mut();
-        for (key, vertices, indices) in new_data.added_meshes.drain(..) {
-            engine.add_mesh(&vertices, &indices, key)?;
-        }
-
-        // TODO: Shaders
-
-        Ok(())
-    }
-
-    pub fn init(&mut self, engine: &mut RenderEngine) -> Result<()> {
-        let mut new_data = self.new_data.borrow_mut();
-
-        // TODO: Move this literally anywhere else lol
-        let my_shader = new_data.shaders.insert(());
-        let fragment_src = &std::fs::read(r"shaders/unlit.frag.spv")?;
-        let vertex_src = &std::fs::read(r"shaders/unlit.vert.spv")?;
-        engine.add_shader(
-            vertex_src,
-            fragment_src,
-            PrimitiveTopology::TRIANGLE_LIST,
-            my_shader,
-        )?;
-
-        self.my_shader = Some(my_shader);
-
-        drop(new_data);
-
-        self.update_lua_data(engine)?;
-
-        Ok(())
+        (
+            std::mem::take(&mut new_data.added_meshes), 
+            std::mem::take(&mut new_data.tracked_shaders)
+        )
     }
 
     /// For recoverable script errors
@@ -158,7 +135,10 @@ impl LuaModule {
         Ok(vec![])
     }
 
-    pub fn frame(&mut self, engine: &mut RenderEngine) -> Result<FramePacket> {
+    /// Run the frame function and build a framepacket
+    /// before using this framepacket, you may want to call dump_data() and process the results,
+    /// since the next frame may use the data from it
+    pub fn frame(&mut self) -> Result<FramePacket> {
         // If frame fn hasn't been installed yet, do nothing 
         let frame_fn = match self.frame_fn.as_ref() {
             Some(f) => f,
@@ -170,8 +150,6 @@ impl LuaModule {
             Err(e) => return self.fail_freeze_frame(e),
             Ok(t) => t,
         };
-
-        self.update_lua_data(engine)?;
 
         // Read draw commands
         let mut cmds = Vec::new();
@@ -195,10 +173,16 @@ impl LuaModule {
                 Ok(m) => m,
             };
 
+            // Read mesh id from the table
+            let shader: Shader = match table.get(3) {
+                Err(e) => return self.fail_freeze_frame(format!("No shader found; {}", e)),
+                Ok(s) => s
+            };
+
             cmds.push(DrawCmd {
                 transform,
                 mesh,
-                shader: self.my_shader.expect("TODO: Replace me with real shader infrastructure!"),
+                shader,
             })
         }
 
@@ -220,14 +204,14 @@ impl NewDataLua {
             })
             .collect();
         let key = self.meshes.insert(());
-        self.added_meshes.push((key, vertices, indices));
+        self.added_meshes.push((key, (vertices, indices)));
         key
     }
 
     pub fn track_shader(
         &mut self,
         vertex_path: String,
-        index_path: String,
+        fragment_path: String,
         primitive: String,
     ) -> Result<Shader, String> {
         let primitive = match primitive.to_lowercase().as_str() {
@@ -237,10 +221,16 @@ impl NewDataLua {
             _ => return Err(format!("Unrecognized primitive type {}", primitive)),
         };
 
-        dbg!(&vertex_path, &index_path, &primitive);
-
         let key = self.shaders.insert(());
-        self.added_shaders.push((key, vertex_path, index_path, primitive));
+
+        let unique_pipeline = UniquePipeline {
+            vertex_path,
+            fragment_path,
+            primitive,
+        };
+
+        self.tracked_shaders.push((key, unique_pipeline));
+
         Ok(key)
     }
 }

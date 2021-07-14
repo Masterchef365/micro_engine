@@ -3,6 +3,7 @@ mod engine;
 mod file_watcher;
 mod lua_module;
 mod main_loop;
+mod shader_update_calc;
 use anyhow::Result;
 use main_loop::Main;
 use watertender::app_info::AppInfo;
