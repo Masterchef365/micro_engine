@@ -20,12 +20,25 @@ impl mlua::UserData for Mesh {}
 
 /// Transform data in column-major format
 pub type Transform = [[f32; 4]; 4];
+pub const TRANSFORM_IDENTITY: Transform = [
+    [1.0, 0.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0, 0.0],
+    [0.0, 0.0, 1.0, 0.0],
+    [0.0, 0.0, 0.0, 1.0],
+];
 
 /// A single object to be drawn
 pub struct DrawCmd {
     pub shader: Shader,
-    pub mesh: Mesh,
-    pub transform: Transform,
+    pub geometry: DrawGeometry,
+    pub transform: Option<Transform>,
+}
+
+pub enum DrawGeometry {
+    Mesh(Mesh),
+    Procedural {
+        n_verts: u32,
+    }
 }
 
 /// A set of draw commands
@@ -239,11 +252,24 @@ impl RenderEngine {
         let cmd = self.starter_kit.begin_command_buffer(frame)?;
 
         // Collect and write transforms
-        let mut positions: Vec<Transform> = packet.iter().map(|cmd| cmd.transform).collect();
+        let mut positions: Vec<Transform> = vec![TRANSFORM_IDENTITY];
+        let mut cmd_transform_indices: Vec<u32> = Vec::with_capacity(packet.len());
+        packet.iter().filter_map(|cmd| cmd.transform).collect();
+        for cmd in &packet {
+            if let Some(transform) = cmd.transform {
+                let idx = positions.len().min(MAX_TRANSFORMS) as u32;
+                cmd_transform_indices.push(idx);
+                positions.push(transform);
+            } else {
+                cmd_transform_indices.push(0);
+            }
+        }
+
         if positions.len() > MAX_TRANSFORMS {
-            eprintln!("Too many positions!");
+            eprintln!("Too many positions! {} exceeded {}", positions.len(), MAX_TRANSFORMS);
             positions.truncate(MAX_TRANSFORMS);
         }
+
         self.transforms[self.starter_kit.frame]
             .write_bytes(0, bytemuck::cast_slice(positions.as_slice()))?;
 
@@ -261,14 +287,8 @@ impl RenderEngine {
 
             // Draw cmds
             // TODO: Batch draw calls per pipeline...
-            for (idx, cmd) in packet.into_iter().enumerate() {
-                let mesh = match self.meshes.get(cmd.mesh) {
-                    Some(m) => m,
-                    None => {
-                        eprintln!("Mesh unavailable!");
-                        continue;
-                    }
-                };
+            for (cmd, transf_idx) in packet.into_iter().zip(cmd_transform_indices) {
+
                 let shader = match self.shaders.get(cmd.shader) {
                     Some(s) => s,
                     None => {
@@ -283,20 +303,35 @@ impl RenderEngine {
                     *shader,
                 );
 
-                core.device.cmd_bind_vertex_buffers(
-                    command_buffer,
-                    0,
-                    &[mesh.vertices.instance()],
-                    &[0],
-                );
-                core.device.cmd_bind_index_buffer(
-                    command_buffer,
-                    mesh.indices.instance(),
-                    0,
-                    vk::IndexType::UINT32,
-                );
+                let n_indices = match cmd.geometry {
+                    DrawGeometry::Mesh(mesh) => {
+                        let mesh = match self.meshes.get(mesh) {
+                            Some(m) => m,
+                            None => {
+                                eprintln!("Mesh unavailable!");
+                                continue;
+                            }
+                        };
 
-                let push_const = [idx as u32];
+                        core.device.cmd_bind_vertex_buffers(
+                            command_buffer,
+                            0,
+                            &[mesh.vertices.instance()],
+                            &[0],
+                        );
+                        core.device.cmd_bind_index_buffer(
+                            command_buffer,
+                            mesh.indices.instance(),
+                            0,
+                            vk::IndexType::UINT32,
+                        );
+
+                        mesh.n_indices
+                    },
+                    DrawGeometry::Procedural { n_verts } => n_verts,
+                };
+
+                let push_const = [transf_idx];
                 // TODO: Make this a shortcut
                 core.device.cmd_push_constants(
                     command_buffer,
@@ -307,8 +342,10 @@ impl RenderEngine {
                     push_const.as_ptr() as _,
                 );
 
-                core.device
-                    .cmd_draw_indexed(command_buffer, mesh.n_indices, 1, 0, 0, 0);
+                match cmd.geometry {
+                    DrawGeometry::Mesh(_) => core.device.cmd_draw_indexed(command_buffer, n_indices, 1, 0, 0, 0),
+                    DrawGeometry::Procedural { .. } => core.device.cmd_draw(command_buffer, 1, 0, 0, 0),
+                }
             }
         }
 

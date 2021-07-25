@@ -8,6 +8,7 @@ use watertender::mainloop::PlatformEvent;
 use watertender::vertex::Vertex;
 use watertender::vk::PrimitiveTopology;
 use crate::shader_update_calc::UniquePipeline;
+use mlua::Table;
 
 /// Lua code
 pub struct LuaModule {
@@ -151,40 +152,7 @@ impl LuaModule {
             Ok(t) => t,
         };
 
-        // Read draw commands
-        let mut cmds = Vec::new();
-        for cmd in table.sequence_values() {
-            // Read the drawcmd's table
-            let table: LuaTable = cmd.map_err(lua_err)?;
-
-            // Read transform data from the table
-            let mut transform: Transform = [[0.0f32; 4]; 4];
-            let in_trans: Vec<f32> = match table.get(1) {
-                Err(e) => return self.fail_freeze_frame(format!("Transform matrix is not a flat array; {}", e)),
-                Ok(i) => i,
-            };
-            for (i, o) in in_trans.chunks_exact(4).zip(transform.iter_mut()) {
-                o.copy_from_slice(&i[..]);
-            }
-
-            // Read mesh id from the table
-            let mesh: Mesh = match table.get(2) {
-                Err(e) => return self.fail_freeze_frame(format!("No mesh found; {}", e)),
-                Ok(m) => m,
-            };
-
-            // Read mesh id from the table
-            let shader: Shader = match table.get(3) {
-                Err(e) => return self.fail_freeze_frame(format!("No shader found; {}", e)),
-                Ok(s) => s
-            };
-
-            cmds.push(DrawCmd {
-                transform,
-                mesh,
-                shader,
-            })
-        }
+        decode_table(&table);
 
         Ok(cmds)
     }
@@ -233,4 +201,44 @@ impl NewDataLua {
 
         Ok(key)
     }
+}
+
+fn decode_draw_table(table: Table<'_>) -> Result<Vec<DrawCmd>> {
+    // Read draw commands
+    let mut cmds = Vec::new();
+    for cmd in table.sequence_values() {
+        // Read the drawcmd's table
+        let table: LuaTable = cmd.map_err(lua_err)?;
+        let draw_cmd = decode_draw_cmd(table).context("Failed to decode draw cmd")?;
+        cmds.push(draw_cmd);
+    }
+
+    Ok(cmds)
+}
+
+fn decode_draw_cmd(table: Table<'_>) -> Result<DrawCmd> {
+    // Read transform data from the table
+    let mut transform: Transform = [[0.0f32; 4]; 4];
+    //let transform = if table.contains_key("tfm")? {
+    let in_trans: Vec<f32> = match table.get("") {
+        Err(e) => return self.fail_freeze_frame(format!("Transform matrix is not a flat array; {}", e)),
+        Ok(i) => i,
+    };
+    for (i, o) in in_trans.chunks_exact(4).zip(transform.iter_mut()) {
+        o.copy_from_slice(&i[..]);
+    }
+
+    // Read mesh id from the table
+    let mesh: Mesh = match table.get(2) {
+        Err(e) => return self.fail_freeze_frame(format!("No mesh found; {}", e)),
+        Ok(m) => m,
+    };
+
+    // Read mesh id from the table
+    let shader: Shader = match table.get(3) {
+        Err(e) => return self.fail_freeze_frame(format!("No shader found; {}", e)),
+        Ok(s) => s
+    };
+
+    Ok(todo!())
 }
