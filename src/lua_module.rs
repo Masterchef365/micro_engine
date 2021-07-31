@@ -155,7 +155,10 @@ impl LuaModule {
         // TODO: This is magic! Magic is exciting! But it is also a huge pain in the bunghole.
         // Please choose another interface lmao
         let anim = table.get("anim").unwrap_or(0.0);
-        let cmds = decode_draw_table(table)?;
+        let cmds = match decode_draw_table(table) {
+            Err(e) => return self.fail_freeze_frame(e),
+            Ok(t) => t,
+        };
 
         Ok(FramePacket {
             anim,
