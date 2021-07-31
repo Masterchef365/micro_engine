@@ -47,8 +47,11 @@ impl ShaderUpdateCalculator {
     }
 
     pub fn shader_file_touched(&mut self, path: &std::path::Path) {
-        if let Some(shaders) = self.path_to_shader.get(path) {
-            self.updates.extend(shaders);
+        if let Some(path) = path.canonicalize().ok() {
+            let maybe_shaders = self.path_to_shader.get(&path);
+            if let Some(shaders) = maybe_shaders {
+                self.updates.extend(shaders);
+            }
         }
     }
 
