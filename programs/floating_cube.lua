@@ -14,17 +14,17 @@ function frame()
     anim = anim + 0.01
     return {
         {
-            cannon(gemm(
+            trans=cannon(gemm(
                 translate(0, math.sin(anim), 0),
                 rot_y(anim)
             )),
-            mesh,
-            shader,
+            mesh=mesh,
+            shader=shader,
         },
         {
-            cannon(translate(3, 0, 0)),
-            mesh,
-            shader,
+            trans=cannon(translate(3, 0, 0)),
+            mesh=mesh,
+            shader=shader,
         },
     }
 end

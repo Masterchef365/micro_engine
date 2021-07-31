@@ -249,12 +249,9 @@ impl RenderEngine {
         platform: Platform<'_>,
         packet: FramePacket,
     ) -> Result<PlatformReturn> {
-        let cmd = self.starter_kit.begin_command_buffer(frame)?;
-
         // Collect and write transforms
         let mut positions: Vec<Transform> = vec![TRANSFORM_IDENTITY];
         let mut cmd_transform_indices: Vec<u32> = Vec::with_capacity(packet.len());
-        packet.iter().filter_map(|cmd| cmd.transform).collect();
         for cmd in &packet {
             if let Some(transform) = cmd.transform {
                 let idx = positions.len().min(MAX_TRANSFORMS) as u32;
@@ -264,6 +261,7 @@ impl RenderEngine {
                 cmd_transform_indices.push(0);
             }
         }
+        assert_eq!(packet.len(), cmd_transform_indices.len());
 
         if positions.len() > MAX_TRANSFORMS {
             eprintln!("Too many positions! {} exceeded {}", positions.len(), MAX_TRANSFORMS);
@@ -273,8 +271,10 @@ impl RenderEngine {
         self.transforms[self.starter_kit.frame]
             .write_bytes(0, bytemuck::cast_slice(positions.as_slice()))?;
 
+        let command_buffer_start = self.starter_kit.begin_command_buffer(frame)?;
+
         // Write command buffer
-        let command_buffer = cmd.command_buffer;
+        let command_buffer = command_buffer_start.command_buffer;
         unsafe {
             core.device.cmd_bind_descriptor_sets(
                 command_buffer,
@@ -360,7 +360,7 @@ impl RenderEngine {
         )?;
 
         // End draw cmds
-        self.starter_kit.end_command_buffer(cmd)?;
+        self.starter_kit.end_command_buffer(command_buffer_start)?;
 
         Ok(ret)
     }

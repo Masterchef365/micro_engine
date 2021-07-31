@@ -1,6 +1,6 @@
 use crate::console::console_print;
-use crate::engine::{DrawCmd, FramePacket, Mesh, RenderEngine, Shader, Transform};
-use anyhow::{format_err, Context, Result};
+use crate::engine::{DrawCmd, DrawGeometry, FramePacket, Mesh, RenderEngine, Shader, Transform};
+use anyhow::{format_err, Context, Result, bail};
 use mlua::prelude::*;
 use slotmap::SlotMap;
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
@@ -152,7 +152,7 @@ impl LuaModule {
             Ok(t) => t,
         };
 
-        decode_table(&table);
+        let cmds = decode_draw_table(table)?;
 
         Ok(cmds)
     }
@@ -220,8 +220,9 @@ fn decode_draw_cmd(table: Table<'_>) -> Result<DrawCmd> {
     // Read transform data from the table
     let mut transform: Transform = [[0.0f32; 4]; 4];
     //let transform = if table.contains_key("tfm")? {
-    let in_trans: Vec<f32> = match table.get("") {
-        Err(e) => return self.fail_freeze_frame(format!("Transform matrix is not a flat array; {}", e)),
+    let in_trans: Vec<f32> = match table.get("trans") {
+        //Err(e) => return self.fail_freeze_frame(format!("Transform matrix is not a flat array; {}", e)),
+        Err(e) => bail!("Transform matrix is not a flat array; {}", e),
         Ok(i) => i,
     };
     for (i, o) in in_trans.chunks_exact(4).zip(transform.iter_mut()) {
@@ -229,16 +230,21 @@ fn decode_draw_cmd(table: Table<'_>) -> Result<DrawCmd> {
     }
 
     // Read mesh id from the table
-    let mesh: Mesh = match table.get(2) {
-        Err(e) => return self.fail_freeze_frame(format!("No mesh found; {}", e)),
+    let mesh: Mesh = match table.get("mesh") {
+        //Err(e) => return self.fail_freeze_frame(format!("No mesh found; {}", e)),
+        Err(e) => bail!("No mesh found; {}", e),
         Ok(m) => m,
     };
 
     // Read mesh id from the table
-    let shader: Shader = match table.get(3) {
-        Err(e) => return self.fail_freeze_frame(format!("No shader found; {}", e)),
+    let shader: Shader = match table.get("shader") {
+        Err(e) => bail!("No shader found; {}", e),
         Ok(s) => s
     };
 
-    Ok(todo!())
+    Ok(DrawCmd {
+        shader,
+        geometry: DrawGeometry::Mesh(mesh),
+        transform: Some(transform),
+    })
 }
