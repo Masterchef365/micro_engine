@@ -133,7 +133,7 @@ impl LuaModule {
     fn fail_freeze_frame<E: std::fmt::Display>(&mut self, err: E) -> Result<FramePacket> {
         console_print(&format!("Error in frame(), stopping until reload: {}", err));
         self.frame_fn = None;
-        Ok(vec![])
+        Ok(FramePacket::default())
     }
 
     /// Run the frame function and build a framepacket
@@ -143,7 +143,7 @@ impl LuaModule {
         // If frame fn hasn't been installed yet, do nothing 
         let frame_fn = match self.frame_fn.as_ref() {
             Some(f) => f,
-            None => return Ok(vec![]),
+            None => return Ok(FramePacket::default()),
         };
 
         // Call frame function
@@ -151,10 +151,16 @@ impl LuaModule {
             Err(e) => return self.fail_freeze_frame(e),
             Ok(t) => t,
         };
-
+        
+        // TODO: This is magic! Magic is exciting! But it is also a huge pain in the bunghole.
+        // Please choose another interface lmao
+        let anim = table.get("anim").unwrap_or(0.0);
         let cmds = decode_draw_table(table)?;
 
-        Ok(cmds)
+        Ok(FramePacket {
+            anim,
+            cmds,
+        })
     }
 
     pub fn event(&mut self, _engine: &mut RenderEngine, _event: &PlatformEvent) -> Result<()> {

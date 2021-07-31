@@ -42,7 +42,10 @@ pub enum DrawGeometry {
 }
 
 /// A set of draw commands
-pub type FramePacket = Vec<DrawCmd>;
+pub struct FramePacket {
+    pub cmds: Vec<DrawCmd>,
+    pub anim: f32,
+}
 
 /// Rendering engine
 pub struct RenderEngine {
@@ -58,7 +61,6 @@ pub struct RenderEngine {
     pipeline_layout: vk::PipelineLayout,
     scene_ubo: FrameDataUbo<SceneData>,
     camera: MultiPlatformCamera,
-    anim: f32,
     starter_kit: StarterKit,
 }
 
@@ -227,7 +229,6 @@ impl RenderEngine {
 
         let instance = Self {
             camera,
-            anim: 0.0,
             pipeline_layout,
             scene_ubo,
             starter_kit,
@@ -251,8 +252,8 @@ impl RenderEngine {
     ) -> Result<PlatformReturn> {
         // Collect and write transforms
         let mut positions: Vec<Transform> = vec![TRANSFORM_IDENTITY];
-        let mut cmd_transform_indices: Vec<u32> = Vec::with_capacity(packet.len());
-        for cmd in &packet {
+        let mut cmd_transform_indices: Vec<u32> = Vec::with_capacity(packet.cmds.len());
+        for cmd in &packet.cmds {
             if let Some(transform) = cmd.transform {
                 let idx = positions.len().min(MAX_TRANSFORMS) as u32;
                 cmd_transform_indices.push(idx);
@@ -261,7 +262,7 @@ impl RenderEngine {
                 cmd_transform_indices.push(0);
             }
         }
-        assert_eq!(packet.len(), cmd_transform_indices.len());
+        assert_eq!(packet.cmds.len(), cmd_transform_indices.len());
 
         if positions.len() > MAX_TRANSFORMS {
             eprintln!("Too many positions! {} exceeded {}", positions.len(), MAX_TRANSFORMS);
@@ -287,7 +288,7 @@ impl RenderEngine {
 
             // Draw cmds
             // TODO: Batch draw calls per pipeline...
-            for (cmd, transf_idx) in packet.into_iter().zip(cmd_transform_indices) {
+            for (cmd, transf_idx) in packet.cmds.into_iter().zip(cmd_transform_indices) {
 
                 let shader = match self.shaders.get(cmd.shader) {
                     Some(s) => s,
@@ -355,14 +356,12 @@ impl RenderEngine {
             self.starter_kit.frame,
             &SceneData {
                 cameras,
-                anim: self.anim,
+                anim: packet.anim,
             },
         )?;
 
         // End draw cmds
         self.starter_kit.end_command_buffer(command_buffer_start)?;
-
-        self.anim += 1.;
 
         Ok(ret)
     }
@@ -396,6 +395,15 @@ impl Drop for RenderEngine {
             for (_, pipeline) in self.shaders.drain() {
                 self.starter_kit.core.device.destroy_pipeline(Some(pipeline), None);
             }
+        }
+    }
+}
+
+impl Default for FramePacket {
+    fn default() -> Self {
+        FramePacket {
+            cmds: vec![],
+            anim: 0.
         }
     }
 }

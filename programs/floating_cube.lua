@@ -13,6 +13,7 @@ end
 function frame()
     anim = anim + 0.01
     return {
+        anim=anim,
         {
             trans=cannon(gemm(
                 translate(0, math.sin(anim), 0),
