@@ -362,6 +362,8 @@ impl RenderEngine {
         // End draw cmds
         self.starter_kit.end_command_buffer(command_buffer_start)?;
 
+        self.anim += 1.;
+
         Ok(ret)
     }
 
