@@ -35,7 +35,14 @@ pub struct DrawCmd {
 }
 
 pub enum DrawGeometry {
-    Mesh(Mesh),
+    /// Draw a mesh from a buffer
+    Mesh {
+        /// Mesh to be drawn
+        mesh: Mesh,
+        /// Maximum index; if None the entire mesh will be drawn
+        max_idx: Option<u32>,
+    },
+    /// Draw a mesh without a buffer
     Procedural {
         n_verts: u32,
     }
@@ -304,8 +311,19 @@ impl RenderEngine {
                     *shader,
                 );
 
-                let n_indices = match cmd.geometry {
-                    DrawGeometry::Mesh(mesh) => {
+                let push_const = [transf_idx];
+                // TODO: Make this a shortcut
+                core.device.cmd_push_constants(
+                    command_buffer,
+                    self.pipeline_layout,
+                    vk::ShaderStageFlags::VERTEX,
+                    0,
+                    std::mem::size_of_val(&push_const) as u32,
+                    push_const.as_ptr() as _,
+                );
+
+                match cmd.geometry {
+                    DrawGeometry::Mesh { mesh, max_idx } => {
                         let mesh = match self.meshes.get(mesh) {
                             Some(m) => m,
                             None => {
@@ -320,6 +338,7 @@ impl RenderEngine {
                             &[mesh.vertices.instance()],
                             &[0],
                         );
+
                         core.device.cmd_bind_index_buffer(
                             command_buffer,
                             mesh.indices.instance(),
@@ -327,25 +346,16 @@ impl RenderEngine {
                             vk::IndexType::UINT32,
                         );
 
-                        mesh.n_indices
+                        let max_idx = match max_idx {
+                            Some(max) => max.min(mesh.n_indices),
+                            None => mesh.n_indices,
+                        };
+
+                        core.device.cmd_draw_indexed(command_buffer, max_idx, 1, 0, 0, 0);
                     },
-                    DrawGeometry::Procedural { n_verts } => n_verts,
-                };
-
-                let push_const = [transf_idx];
-                // TODO: Make this a shortcut
-                core.device.cmd_push_constants(
-                    command_buffer,
-                    self.pipeline_layout,
-                    vk::ShaderStageFlags::VERTEX,
-                    0,
-                    std::mem::size_of_val(&push_const) as u32,
-                    push_const.as_ptr() as _,
-                );
-
-                match cmd.geometry {
-                    DrawGeometry::Mesh(_) => core.device.cmd_draw_indexed(command_buffer, n_indices, 1, 0, 0, 0),
-                    DrawGeometry::Procedural { .. } => core.device.cmd_draw(command_buffer, 1, 0, 0, 0),
+                    DrawGeometry::Procedural { n_verts } => {
+                        core.device.cmd_draw(command_buffer, n_verts, 0, 0, 0);
+                    },
                 }
             }
         }

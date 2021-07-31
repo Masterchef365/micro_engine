@@ -226,6 +226,8 @@ fn decode_draw_cmd(table: Table<'_>) -> Result<DrawCmd> {
     // Read transform data from the table
     let mut transform: Transform = [[0.0f32; 4]; 4];
     //let transform = if table.contains_key("tfm")? {
+
+    // TODO: Optional transform! Use 
     let in_trans: Vec<f32> = match table.get("trans") {
         //Err(e) => return self.fail_freeze_frame(format!("Transform matrix is not a flat array; {}", e)),
         Err(e) => bail!("Transform matrix is not a flat array; {}", e),
@@ -236,11 +238,8 @@ fn decode_draw_cmd(table: Table<'_>) -> Result<DrawCmd> {
     }
 
     // Read mesh id from the table
-    let mesh: Mesh = match table.get("mesh") {
-        //Err(e) => return self.fail_freeze_frame(format!("No mesh found; {}", e)),
-        Err(e) => bail!("No mesh found; {}", e),
-        Ok(m) => m,
-    };
+    let mesh: Option<Mesh> = table.get("mesh").ok();
+    let n_indices: Option<u32> = table.get("n_indices").ok();
 
     // Read mesh id from the table
     let shader: Shader = match table.get("shader") {
@@ -248,9 +247,20 @@ fn decode_draw_cmd(table: Table<'_>) -> Result<DrawCmd> {
         Ok(s) => s
     };
 
+    let geometry = match (mesh, n_indices) {
+        (Some(mesh), max_idx) => DrawGeometry::Mesh {
+            mesh,
+            max_idx,
+        },
+        (None, Some(n_verts)) => DrawGeometry::Procedural {
+            n_verts
+        },
+        (None, None) => bail!("DrawCmd missing both mesh and n_indices"),
+    };
+
     Ok(DrawCmd {
         shader,
-        geometry: DrawGeometry::Mesh(mesh),
+        geometry,
         transform: Some(transform),
     })
 }
