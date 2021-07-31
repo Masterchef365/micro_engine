@@ -5,6 +5,7 @@ function reload()
     if init == nil then
         anim = 0.0
         mesh = add_mesh(table.unpack(rainbow_cube()))
+        shader = track_shader("shaders/unlit.vert", "shaders/unlit.frag", "tri")
         init = true
     end
 end
@@ -33,8 +34,9 @@ function frame()
         if i <= qn then
             objs[i] = {
                 --cannon(translate(x, y, z)),
-                cannon(gemm(translate(x, y, z), rot_y(theta))),
-                mesh
+                trans=cannon(gemm(translate(x, y, z), rot_y(theta))),
+                shader=shader,
+                mesh=mesh
             }
         end
     end
