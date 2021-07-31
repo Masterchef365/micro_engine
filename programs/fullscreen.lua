@@ -4,7 +4,7 @@ dofile("programs/rainbow_cube.lua")
 function reload()
     if init == nil then
         anim = 0.0
-        fullscreen = track_shader("shaders/fullscreen_tri.vert", "shaders/unlit.frag", "tri")
+        fullscreen = track_shader("shaders/fullscreen_tri.vert", "shaders/neat_pattern.frag", "tri")
         init = true
     end
 end
