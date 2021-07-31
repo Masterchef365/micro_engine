@@ -226,19 +226,18 @@ fn decode_draw_table(table: Table<'_>) -> Result<Vec<DrawCmd>> {
 }
 
 fn decode_draw_cmd(table: Table<'_>) -> Result<DrawCmd> {
-    // Read transform data from the table
-    let mut transform: Transform = [[0.0f32; 4]; 4];
-    //let transform = if table.contains_key("tfm")? {
-
-    // TODO: Optional transform! Use 
-    let in_trans: Vec<f32> = match table.get("trans") {
+    // Optionally get the transform matrix
+    let transform = match table.get::<_, Vec<f32>>("trans") {
         //Err(e) => return self.fail_freeze_frame(format!("Transform matrix is not a flat array; {}", e)),
-        Err(e) => bail!("Transform matrix is not a flat array; {}", e),
-        Ok(i) => i,
+        Err(_) => None,
+        Ok(in_trans) => {
+            let mut transform: Transform = [[0.0f32; 4]; 4];
+            for (i, o) in in_trans.chunks_exact(4).zip(transform.iter_mut()) {
+                o.copy_from_slice(&i[..]);
+            }
+            Some(transform)
+        },
     };
-    for (i, o) in in_trans.chunks_exact(4).zip(transform.iter_mut()) {
-        o.copy_from_slice(&i[..]);
-    }
 
     // Read mesh id from the table
     let mesh: Option<Mesh> = table.get("mesh").ok();
@@ -264,6 +263,6 @@ fn decode_draw_cmd(table: Table<'_>) -> Result<DrawCmd> {
     Ok(DrawCmd {
         shader,
         geometry,
-        transform: Some(transform),
+        transform,
     })
 }

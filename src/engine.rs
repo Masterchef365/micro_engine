@@ -34,6 +34,7 @@ pub struct DrawCmd {
     pub transform: Option<Transform>,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum DrawGeometry {
     /// Draw a mesh from a buffer
     Mesh {
@@ -354,7 +355,7 @@ impl RenderEngine {
                         core.device.cmd_draw_indexed(command_buffer, max_idx, 1, 0, 0, 0);
                     },
                     DrawGeometry::Procedural { n_verts } => {
-                        core.device.cmd_draw(command_buffer, n_verts, 0, 0, 0);
+                        core.device.cmd_draw(command_buffer, n_verts, 1, 0, 0);
                     },
                 }
             }
