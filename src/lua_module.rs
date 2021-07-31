@@ -131,7 +131,7 @@ impl LuaModule {
 
     /// For recoverable script errors
     fn fail_freeze_frame<E: std::fmt::Display>(&mut self, err: E) -> Result<FramePacket> {
-        console_print(&format!("Error in frame(), stopping until reload: {}", err));
+        console_print(&format!("Error in frame(), stopping until reload: {:#}", err));
         self.frame_fn = None;
         Ok(FramePacket::default())
     }
@@ -156,7 +156,7 @@ impl LuaModule {
         // Please choose another interface lmao
         let anim = table.get("anim").unwrap_or(0.0);
         let cmds = match decode_draw_table(table) {
-            Err(e) => return self.fail_freeze_frame(e),
+            Err(e) => return self.fail_freeze_frame(dbg!(e)),
             Ok(t) => t,
         };
 
