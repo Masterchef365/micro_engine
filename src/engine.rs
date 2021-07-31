@@ -301,7 +301,7 @@ impl RenderEngine {
                 let shader = match self.shaders.get(cmd.shader) {
                     Some(s) => s,
                     None => {
-                        eprintln!("Shader unavailable!");
+                        //eprintln!("Shader unavailable!");
                         continue;
                     }
                 };
@@ -328,7 +328,7 @@ impl RenderEngine {
                         let mesh = match self.meshes.get(mesh) {
                             Some(m) => m,
                             None => {
-                                eprintln!("Mesh unavailable!");
+                                //eprintln!("Mesh unavailable!");
                                 continue;
                             }
                         };
