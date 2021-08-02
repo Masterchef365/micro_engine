@@ -71,6 +71,7 @@ impl MainLoop for Main {
 
         let midi_conn = if let Some(port) = port {
             let conn = midi_in.connect(&port, "Some bullshit", move |stamp, message, _| {
+                //dbg!(stamp, &message);
                 midi_updates_midir.lock().unwrap().push(MidiUpdate { stamp, message: message.to_vec() })
             }, ())?;
             Some(conn)
@@ -154,7 +155,12 @@ impl MainLoop for Main {
         // Get latest midi frame
         let mut midi_updates: Vec<MidiUpdate> = std::mem::take(self.midi_updates.lock().unwrap().as_mut());
         if let Some(latest) = midi_updates.pop() {
-            latest.message.into_iter().zip(&mut self.midi_vals).for_each(|(l, d)| *d = l as u32);
+            let idx = latest.message[1] as usize;
+            let val = latest.message[2] as u32;
+            if idx < 3 {
+                self.midi_vals[idx] = val;
+                dbg!(self.midi_vals);
+            }
         }
 
         let packet = FramePacket {

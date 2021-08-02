@@ -78,8 +78,8 @@ pub struct RenderEngine {
 #[derive(Copy, Clone, Debug)]
 struct SceneData {
     cameras: [f32; 4 * 4 * 2],
-    anim: f32,
     midi: [u32; 3],
+    anim: f32,
 }
 
 unsafe impl bytemuck::Zeroable for SceneData {}

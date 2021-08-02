@@ -4,6 +4,7 @@
 // Per-frame UBO
 layout(binding = 0) uniform PerFrame {
     mat4 camera[2];
+    uvec3 midi;
     float anim;
 };
 
