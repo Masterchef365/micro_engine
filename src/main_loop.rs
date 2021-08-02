@@ -2,7 +2,7 @@ use crate::console::{console as run_console, print_lua_ret, ConsoleMsg};
 use crate::engine::{FramePacket, RenderEngine};
 use crate::file_watcher::watch;
 use crate::lua_module::LuaModule;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, format_err};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
 use watertender::prelude::*;
@@ -72,7 +72,7 @@ impl MainLoop for Main {
         let midi_conn = if let Some(port) = port {
             let conn = midi_in.connect(&port, "Some bullshit", move |stamp, message, _| {
                 midi_updates_midir.lock().unwrap().push(MidiUpdate { stamp, message: message.to_vec() })
-            }, ())?;
+            }, ()).map_err(|e| format_err!("{}", e))?;
             Some(conn)
         } else {
             None
