@@ -1,5 +1,6 @@
 use crate::console::console_print;
 use crate::engine::{DrawCmd, DrawGeometry, FramePacket, Mesh, RenderEngine, Shader, Transform};
+use crate::main_loop::MidiUpdate;
 use anyhow::{format_err, Context, Result, bail};
 use mlua::prelude::*;
 use slotmap::SlotMap;
@@ -15,6 +16,7 @@ pub struct LuaModule {
     new_data: Rc<RefCell<NewDataLua>>,
     pub lua: &'static Lua,
     frame_fn: Option<LuaFunction<'static>>,
+    midi_fn: Option<LuaFunction<'static>>,
     path: PathBuf,
 }
 
@@ -71,6 +73,7 @@ impl LuaModule {
             path,
             lua,
             frame_fn: None,
+            midi_fn: None,
             new_data,
         };
 
@@ -116,6 +119,11 @@ impl LuaModule {
             .get::<_, LuaFunction>("frame")
             .map_err(lua_err).context("Requires frame() fn")?;
         self.frame_fn = Some(frame_fn);
+
+        self.midi_fn = globals
+            .get::<_, LuaFunction>("midi")
+            .ok();
+
 
         Ok(())
     }
@@ -167,6 +175,19 @@ impl LuaModule {
     }
 
     pub fn event(&mut self, _engine: &mut RenderEngine, _event: &PlatformEvent) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn midi(&mut self, events: &[MidiUpdate]) -> Result<()> {
+        if let Some(midi_fn) = self.midi_fn.as_ref() {
+            for event in events {
+                let table = self.lua.create_table().map_err(lua_err)?;
+                table.set("stamp", event.stamp).map_err(lua_err)?;
+                table.set("msg", event.message.to_vec()).map_err(lua_err)?;
+                let _:() = midi_fn.call(table).map_err(lua_err)?;
+            }
+        }
+
         Ok(())
     }
 }

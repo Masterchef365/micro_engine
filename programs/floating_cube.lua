@@ -10,6 +10,13 @@ function reload()
     end
 end
 
+function midi(data)
+    print(data.stamp)
+    print(data.msg[1])
+    print(data.msg[2])
+    print(data.msg[3])
+end
+
 function frame()
     anim = anim + 0.01
     return {

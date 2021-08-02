@@ -149,11 +149,10 @@ impl MainLoop for Main {
         // Handle new shaders and meshes
         self.handle_lua_updates()?;
 
-        // Get render packet
-        let lua_frame = self.lua_module.frame()?;
-
         // Get latest midi frame
         let mut midi_updates: Vec<MidiUpdate> = std::mem::take(self.midi_updates.lock().unwrap().as_mut());
+        self.lua_module.midi(&midi_updates)?;
+
         if let Some(latest) = midi_updates.pop() {
             let idx = latest.message[1] as usize;
             let val = latest.message[2] as u32;
@@ -162,6 +161,9 @@ impl MainLoop for Main {
                 dbg!(self.midi_vals);
             }
         }
+
+        // Get render packet
+        let lua_frame = self.lua_module.frame()?;
 
         let packet = FramePacket {
             cmds: lua_frame.cmds,
