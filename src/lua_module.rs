@@ -130,20 +130,20 @@ impl LuaModule {
     }
 
     /// For recoverable script errors
-    fn fail_freeze_frame<E: std::fmt::Display>(&mut self, err: E) -> Result<FramePacket> {
+    fn fail_freeze_frame<E: std::fmt::Display>(&mut self, err: E) -> Result<LuaFrame> {
         console_print(&format!("Error in frame(), stopping until reload: {:#}", err));
         self.frame_fn = None;
-        Ok(FramePacket::default())
+        Ok(LuaFrame::default())
     }
 
     /// Run the frame function and build a framepacket
     /// before using this framepacket, you may want to call dump_data() and process the results,
     /// since the next frame may use the data from it
-    pub fn frame(&mut self) -> Result<FramePacket> {
+    pub fn frame(&mut self) -> Result<LuaFrame> {
         // If frame fn hasn't been installed yet, do nothing 
         let frame_fn = match self.frame_fn.as_ref() {
             Some(f) => f,
-            None => return Ok(FramePacket::default()),
+            None => return Ok(LuaFrame::default()),
         };
 
         // Call frame function
@@ -160,7 +160,7 @@ impl LuaModule {
             Ok(t) => t,
         };
 
-        Ok(FramePacket {
+        Ok(LuaFrame {
             anim,
             cmds,
         })
@@ -168,6 +168,21 @@ impl LuaModule {
 
     pub fn event(&mut self, _engine: &mut RenderEngine, _event: &PlatformEvent) -> Result<()> {
         Ok(())
+    }
+}
+
+/// A set of draw commands
+pub struct LuaFrame {
+    pub cmds: Vec<DrawCmd>,
+    pub anim: f32,
+}
+
+impl Default for LuaFrame {
+    fn default() -> Self {
+        Self {
+            cmds: vec![],
+            anim: 0.,
+        }
     }
 }
 

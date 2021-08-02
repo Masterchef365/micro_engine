@@ -52,6 +52,7 @@ pub enum DrawGeometry {
 /// A set of draw commands
 pub struct FramePacket {
     pub cmds: Vec<DrawCmd>,
+    pub midi: [u32; 3],
     pub anim: f32,
 }
 
@@ -78,6 +79,7 @@ pub struct RenderEngine {
 struct SceneData {
     cameras: [f32; 4 * 4 * 2],
     anim: f32,
+    midi: [u32; 3],
 }
 
 unsafe impl bytemuck::Zeroable for SceneData {}
@@ -368,6 +370,7 @@ impl RenderEngine {
             &SceneData {
                 cameras,
                 anim: packet.anim,
+                midi: packet.midi,
             },
         )?;
 
@@ -414,7 +417,8 @@ impl Default for FramePacket {
     fn default() -> Self {
         FramePacket {
             cmds: vec![],
-            anim: 0.
+            anim: 0.,
+            midi: [0; 3],
         }
     }
 }
