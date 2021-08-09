@@ -178,9 +178,17 @@ impl LuaModule {
         Ok(())
     }
 
-    pub fn midi(&mut self, events: &[MidiUpdate]) -> Result<()> {
+    pub fn midi(&mut self, events: &[MidiUpdate]) {
+        match self.try_midi(events) {
+            Err(e) => console_print(&format!("Midi error: {}", e)),
+            Ok(_) => ()
+        }
+    }
+
+    fn try_midi(&mut self, events: &[MidiUpdate]) -> Result<()> {
         if let Some(midi_fn) = self.midi_fn.as_ref() {
-            for event in events {
+            //for event in events {
+            if let Some(event) = events.last() {
                 let table = self.lua.create_table().map_err(lua_err)?;
                 table.set("stamp", event.stamp).map_err(lua_err)?;
                 table.set("msg", event.message.to_vec()).map_err(lua_err)?;

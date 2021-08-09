@@ -2,6 +2,11 @@ dofile("programs/lin_alg.lua")
 dofile("programs/rainbow_cube.lua")
 
 function reload()
+    midi_states = {}
+    for i = 1, 16 do
+        midi_states[i] = 0.0
+    end
+
     if init == nil then
         anim = 0.0
         mesh = add_mesh(table.unpack(rainbow_cube()))
@@ -11,10 +16,7 @@ function reload()
 end
 
 function midi(data)
-    print(data.stamp)
-    print(data.msg[1])
-    print(data.msg[2])
-    print(data.msg[3])
+    midi_states[data.msg[2]+1] = data.msg[3]
 end
 
 function frame()
@@ -22,15 +24,11 @@ function frame()
     return {
         anim=anim,
         {
-            trans=cannon(gemm(
-                translate(0, math.sin(anim), 0),
-                rot_y(anim)
-            )),
-            mesh=mesh,
-            shader=shader,
-        },
-        {
-            trans=cannon(translate(3, 0, 0)),
+            trans=cannon(translate(0, midi_states[1] / 80., 0)),
+            -- trans=cannon(gemm(
+            --     translate(0, midi_states[1] / 80., 0),
+            --     rot_y(anim)
+            -- )),
             mesh=mesh,
             shader=shader,
         },

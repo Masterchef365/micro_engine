@@ -151,14 +151,13 @@ impl MainLoop for Main {
 
         // Get latest midi frame
         let mut midi_updates: Vec<MidiUpdate> = std::mem::take(self.midi_updates.lock().unwrap().as_mut());
-        self.lua_module.midi(&midi_updates)?;
+        self.lua_module.midi(&midi_updates);
 
         if let Some(latest) = midi_updates.pop() {
             let idx = latest.message[1] as usize;
             let val = latest.message[2] as u32;
             if idx < 3 {
                 self.midi_vals[idx] = val;
-                dbg!(self.midi_vals);
             }
         }
 
