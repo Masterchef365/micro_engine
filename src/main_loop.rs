@@ -154,7 +154,10 @@ impl MainLoop for Main {
         // Get latest midi frame
         let mut midi_updates: Vec<MidiUpdate> = std::mem::take(self.midi_updates.lock().unwrap().as_mut());
         if let Some(latest) = midi_updates.pop() {
-            latest.message.into_iter().zip(&mut self.midi_vals).for_each(|(l, d)| *d = l as u32);
+            let idx = latest.message[1] as usize;
+            if idx < self.midi_vals.len() {
+                self.midi_vals[idx] = latest.message[2] as _;
+            }
         }
 
         let packet = FramePacket {
