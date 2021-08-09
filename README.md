@@ -9,14 +9,14 @@ A very WIP scriptable game and visualization framework
 - [x] Interactive prompt 
 - [x] Better error handling
 - [x] LightUserData for slotmap keys/handles in LUA
-- [ ] Reset function
-- [ ] Keyboard input
 - [x] More primitives for scripts (Lines, Points, ...)
-- [ ] Text
-- [ ] Window dimensions
+- [x] Hotload shaders
+- [ ] Winit events
+- [ ] Uniform buffer
+- [ ] Text objects
+- [ ] Window dimensions in shaders
 - [ ] Mouse input
 - [ ] Textures
-- [x] Hotload shaders
 - [ ] Dynamic meshes
 
 # LUA interface for rendering, very simple:
