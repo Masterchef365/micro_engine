@@ -24,7 +24,11 @@ function frame()
     return {
         anim=anim,
         {
-            trans=cannon(translate(0, midi_states[1] / 80., 0)),
+            trans=cannon(translate(
+                midi_states[1] / 80., 
+                midi_states[2] / 80., 
+                midi_states[3] / 80.
+            )),
             -- trans=cannon(gemm(
             --     translate(0, midi_states[1] / 80., 0),
             --     rot_y(anim)
