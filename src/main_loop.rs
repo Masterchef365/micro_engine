@@ -8,7 +8,7 @@ use std::sync::mpsc::{self, Receiver};
 use watertender::prelude::*;
 use crate::shader_update_calc::{ShaderUpdateCalculator, compile_jobs};
 use shaderc::Compiler;
-use midir::{Ignore, MidiInput, MidiInputConnection, MidiInputPort};
+use midir::{MidiInput, MidiInputConnection, MidiInputPort};
 use std::io::{stdin, stdout, Write};
 use std::sync::{Arc, Mutex};
 
@@ -63,7 +63,7 @@ impl MainLoop for Main {
         let lua_path = args.next().context("Requires lua path arg")?;
         let watch_path = args.next().unwrap_or(".".into());
 
-        let mut midi_in = MidiInput::new("Micro Engine")?;
+        let midi_in = MidiInput::new("Micro Engine")?;
         let midi_updates = MidiUpdates::new(Mutex::new(vec![]));
 
         let midi_updates_midir = midi_updates.clone();

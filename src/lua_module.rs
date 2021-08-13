@@ -1,5 +1,5 @@
 use crate::console::console_print;
-use crate::engine::{DrawCmd, DrawGeometry, FramePacket, Mesh, RenderEngine, Shader, Transform};
+use crate::engine::{DrawCmd, DrawGeometry, Mesh, RenderEngine, Shader, Transform};
 use anyhow::{format_err, Context, Result, bail};
 use mlua::prelude::*;
 use slotmap::SlotMap;
