@@ -61,7 +61,3 @@ function print_mat(matrix)
         print()
     end
 end
-
-function table.clone(org)
-  return {table.unpack(org)}
-end
