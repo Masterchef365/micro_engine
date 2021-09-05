@@ -58,7 +58,7 @@ fn select_midi_port(midi_in: &MidiInput) -> Result<Option<MidiInputPort>> {
 
 
 impl MainLoop for Main {
-    fn new(core: &SharedCore, platform: Platform<'_>) -> Result<Self> {
+    fn new(core: &SharedCore, platform: Platform<'_>, _: ()) -> Result<Self> {
         let mut args = std::env::args().skip(1);
         let lua_path = args.next().context("Requires lua path arg")?;
         let watch_path = args.next().unwrap_or(".".into());

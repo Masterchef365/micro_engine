@@ -363,7 +363,7 @@ impl RenderEngine {
             }
         }
 
-        let (ret, cameras) = self.camera.get_matrices(platform)?;
+        let (ret, cameras) = self.camera.get_matrices(&platform)?;
 
         self.scene_ubo.upload(
             self.starter_kit.frame,

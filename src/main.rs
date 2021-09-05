@@ -13,5 +13,5 @@ fn main() -> Result<()> {
     //let info = AppInfo::default().validation(cfg!(debug_assertions));
     let info = AppInfo::default().validation(false);
     let vr = std::env::args().count() > 2;
-    launch::<Main>(info, vr)
+    launch::<Main, ()>(info, vr, ())
 }
