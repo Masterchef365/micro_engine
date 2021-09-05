@@ -4,7 +4,8 @@ dofile("programs/rainbow_cube.lua")
 function reload()
     if init == nil then
         anim = 0.0
-        mesh = add_mesh(table.unpack(rainbow_cube()))
+        cube = rainbow_cube()
+        mesh = add_mesh(cube[1], cube[2])
         shader = track_shader("shaders/unlit.vert", "shaders/unlit.frag", "tri")
         init = true
     end
@@ -12,20 +13,16 @@ end
 
 function frame()
     anim = anim + 0.01
-    return {
-        anim=anim,
-        {
+    objs = {anim=anim}
+    for i = 1, 1000 do
+        objs[i] = {
             trans=cannon(gemm(
-                translate(0, math.sin(anim), 0),
-                rot_y(anim)
+                translate(0, i, 0),
+                rot_y(anim + i)
             )),
             mesh=mesh,
             shader=shader,
-        },
-        {
-            trans=cannon(translate(3, 0, 0)),
-            mesh=mesh,
-            shader=shader,
-        },
-    }
+        }
+    end
+    return objs
 end

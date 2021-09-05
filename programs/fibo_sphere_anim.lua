@@ -4,7 +4,8 @@ dofile("programs/rainbow_cube.lua")
 function reload()
     if init == nil then
         anim = 0.0
-        mesh = add_mesh(table.unpack(rainbow_cube()))
+        cube = rainbow_cube()
+        mesh = add_mesh(cube[1], cube[2])
         shader = track_shader("shaders/unlit.vert", "shaders/unlit.frag", "tri")
         init = true
     end
