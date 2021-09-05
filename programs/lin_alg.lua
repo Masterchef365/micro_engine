@@ -6,11 +6,11 @@ identity = {
 }
 
 function gemm(a, b)
-    out = {}
+    local out = {}
     for i=1, 4 do
-        row = {}
+        local row = {}
         for j=1, 4 do
-            m = 0.0
+            local m = 0.0
             for k=1, 4 do
                 m = m + a[k][j] * b[i][k] 
             end
@@ -31,8 +31,8 @@ function translate(x, y, z)
 end
 
 function cannon(matrix)
-    q = 1
-    out = {}
+    local q = 1
+    local out = {}
     for i = 1,4 do
         for j = 1,4 do
             out[q] = matrix[i][j]
