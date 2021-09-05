@@ -1,38 +1,21 @@
-dofile("programs/lin_alg.lua")
-
-function reload()
-    if init == nil then
-        anim = 0.0
+function icosahedron(length, primitive)
+    if primitive == "tris" then
+        indices = icosohedron_triangle_indices()
+    else
+        indices = icosohedron_line_indices()
     end
-    cube = icosahedron()
-    mesh = add_mesh(cube[1], cube[2])
-    shader = track_shader("shaders/unlit.vert", "shaders/unlit.frag", "lines")
-    init = true
+
+    return {
+        icosahedron_verts(length),
+        indices,
+    }
 end
 
-function frame()
-    anim = anim + 0.01
-    local objs = {anim=anim}
-    for i = 1, 1 do
-        objs[i] = {
-            trans=cannon(gemm(
-                translate(0, i, 0),
-                rot_y(anim + i)
-            )),
-            mesh=mesh,
-            shader=shader,
-        }
-    end
-    return objs
-end
-
-function icosahedron()
-    -- Color
-    local color = { 1., 1., 1. }
-
+function icosahedron_verts(length)
     -- Edge length
-    local l = 1.0
+    local l = length;
 
+    -- Color
     local tau = math.pi*2
 
     -- Distance to a vertex from radial center
@@ -53,12 +36,6 @@ function icosahedron()
 
     local vertices = {}
 
-    function addcolor()
-        for k = 1, #(color) do
-            table.insert(vertices, color[k])
-        end
-    end
-
     -- Inner layer vertices
     for j = 1,2 do
         local layer = layers[j]
@@ -76,15 +53,23 @@ function icosahedron()
                 table.insert(vertices, pos[k])
             end
 
-            addcolor()
+            local color
+            if i == 0 then color = { 0, 1, 0 }
+                elseif i == 1 then color = { 1, 0, 0 }
+                elseif i == 2 then color = { 0, 0, 1 }
+                else color = { 1, 0, 1 } end
+
+            for k = 1, #(color) do
+                table.insert(vertices, color[k])
+            end
         end
     end
 
     -- Top and bottom vertices 
     local height = h2/2. + h1
     local top_bot = {
-        { 0.0, height, 0.0 },
-        { 0.0, -height, 0.0 },
+        { 0.0, height, 0.0, 1.0, 1.0, 1.0 },
+        { 0.0, -height, 0.0, 0.01, 0.01, 0.01 },
     }
 
     for j = 1, 2 do
@@ -92,11 +77,14 @@ function icosahedron()
         for k = 1, #pos do
             table.insert(vertices, pos[k])
         end
-        addcolor()
     end
 
+    return vertices
+end
+
+function icosohedron_line_indices()
     -- Create indices
-    indices = {}
+    local indices = {}
 
     -- Inner lines
     for j = 0, 4 do
@@ -122,5 +110,34 @@ function icosahedron()
         table.insert(indices, 5+5+1)
     end
 
-    return { vertices, indices }
+    return indices
+end
+
+function icosohedron_triangle_indices()
+    -- Create indices
+    local indices = {}
+
+    -- Inner lines
+    for j = 0, 4 do
+        -- Inner layers
+        table.insert(indices, (j+1)%5)
+        table.insert(indices, j+5)
+        table.insert(indices, j)
+
+        table.insert(indices, (j+1)%5)
+        table.insert(indices, (j+1)%5+5)
+        table.insert(indices, j+5)
+
+        -- Layers themselves
+        table.insert(indices, (j+1)%5)
+        table.insert(indices, j)
+        table.insert(indices, 5+5)
+
+        -- Connecting to top and bottom vertices
+        table.insert(indices, j+5)
+        table.insert(indices, (j+1)%5+5)
+        table.insert(indices, 5+5+1)
+    end
+
+    return indices
 end
