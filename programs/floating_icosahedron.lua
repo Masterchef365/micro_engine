@@ -4,11 +4,11 @@ dofile("programs/icosahedron.lua")
 function reload()
     if init == nil then
         anim = 0.0
+        cube = icosahedron(3.0, "tris")
+        mesh = add_mesh(cube[1], cube[2])
+        shader = track_shader("shaders/unlit.vert", "shaders/unlit.frag", "triangles")
+        init = true
     end
-    cube = icosahedron(1.0, "tris")
-    mesh = add_mesh(cube[1], cube[2])
-    shader = track_shader("shaders/unlit.vert", "shaders/unlit.frag", "triangles")
-    init = true
 end
 
 function frame()
